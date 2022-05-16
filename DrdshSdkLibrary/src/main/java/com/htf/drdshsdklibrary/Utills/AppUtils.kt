@@ -9,13 +9,15 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
+import android.database.Cursor
+import android.graphics.*
+import android.media.ExifInterface
 import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.text.Html
 import android.util.Base64
@@ -31,17 +33,16 @@ import androidx.fragment.app.Fragment
 import com.google.android.material.snackbar.Snackbar
 import com.htf.drdshsdklibrary.R
 import kotlinx.android.synthetic.main.toast_view.view.*
-import java.io.File
-import java.io.FileOutputStream
-import java.io.UnsupportedEncodingException
+import java.io.*
 import java.net.InetAddress
 import java.net.NetworkInterface
+import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.collections.ArrayList
+import kotlin.math.roundToInt
 
 
 object AppUtils {
@@ -370,9 +371,9 @@ object AppUtils {
                     hashKey += i
                 }
             } else {
-                var value: String = i;
+                var value: String = i
                 if (value == null || value.equals("null", ignoreCase = true)) {
-                    value = "";
+                    value = ""
                 }
                 hashKey += "|"
                 hashKey += value
@@ -395,7 +396,7 @@ object AppUtils {
         } catch (e: NoSuchAlgorithmException) {
             e.printStackTrace()
         }
-        val test: String = enCodeBase64(sb.toString().toUpperCase())
+        val test: String = enCodeBase64(sb.toString().uppercase(Locale.getDefault()))
 //        println("BASE 64 : $test")
         return test
     }
@@ -477,8 +478,8 @@ object AppUtils {
                 val addrs: List<InetAddress> =
                     Collections.list(intf.inetAddresses)
                 for (addr in addrs) {
-                    if (!addr.isLoopbackAddress()) {
-                        val sAddr: String = addr.getHostAddress()
+                    if (!addr.isLoopbackAddress) {
+                        val sAddr: String = addr.hostAddress
                         //boolean isIPv4 = InetAddressUtils.isIPv4Address(sAddr);
                         val isIPv4 = sAddr.indexOf(':') < 0
                         if (useIPv4) {
@@ -486,10 +487,10 @@ object AppUtils {
                         } else {
                             if (!isIPv4) {
                                 val delim = sAddr.indexOf('%') // drop ip6 zone suffix
-                                return if (delim < 0) sAddr.toUpperCase() else sAddr.substring(
-                                    0,
-                                    delim
-                                ).toUpperCase()
+                                return if (delim < 0) sAddr.uppercase(Locale.getDefault()) else sAddr.substring(
+                                                                0,
+                                                                delim
+                                                            ).uppercase(Locale.getDefault())
                             }
                         }
                     }
@@ -516,7 +517,7 @@ object AppUtils {
 
     fun getTimeZone():TimeZone{
         val cal: Calendar = Calendar.getInstance()
-        val tz: TimeZone = cal.getTimeZone()
+        val tz: TimeZone = cal.timeZone
         Log.d("Time zone", "=" + tz.id)
         return tz
     }
@@ -544,8 +545,26 @@ object AppUtils {
 
     fun getMimeType(uri: Uri?, currActivity: Activity): String? {
         var mimeType: String? = null
-        mimeType = if (uri?.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
+        mimeType = if (uri?.scheme.equals(ContentResolver.SCHEME_CONTENT)) {
             val cr: ContentResolver = currActivity.contentResolver
+            cr.getType(uri!!)
+        } else {
+            val fileExtension = MimeTypeMap.getFileExtensionFromUrl(
+                uri
+                    .toString()
+            )
+            MimeTypeMap.getSingleton().getMimeTypeFromExtension(
+                fileExtension.lowercase(Locale.getDefault())
+            )
+        }
+        return mimeType
+    }
+
+    fun getMimeType(file: File): String? {
+        var mimeType: String? = null
+        val uri = Uri.fromFile(file)
+        mimeType = if (uri?.scheme.equals(ContentResolver.SCHEME_CONTENT)) {
+            val cr: ContentResolver = MyApplication.getAppContext().contentResolver
             cr.getType(uri!!)
         } else {
             val fileExtension = MimeTypeMap.getFileExtensionFromUrl(
@@ -559,18 +578,19 @@ object AppUtils {
         return mimeType
     }
 
+
     fun getFileSize(scheme: String, uri: Uri?, currActivity: Activity):Long{
         var dataSize=0
         var size:Long=0
         if(scheme.equals(ContentResolver.SCHEME_CONTENT))
         {
             try {
-                val fileInputStream=currActivity.contentResolver.openInputStream(uri!!);
+                val fileInputStream=currActivity.contentResolver.openInputStream(uri!!)
                 dataSize = fileInputStream!!.available()
             } catch (e:Exception) {
-                e.printStackTrace();
+                e.printStackTrace()
             }
-            System.out.println("File size in bytes"+dataSize);
+            System.out.println("File size in bytes"+dataSize)
 
             size=dataSize.toLong()
 
@@ -582,15 +602,125 @@ object AppUtils {
             try {
                 f =File(path)
             } catch (e:Exception) {
-                e.printStackTrace();
+                e.printStackTrace()
             }
-            System.out.println("File size in bytes"+f!!.length());
+            System.out.println("File size in bytes"+f!!.length())
 
-            size=f!!.length()
+            size= f.length()
         }
 
         return size
 
+    }
+
+
+
+    private fun reduceFile(newFile: File, mainFile: File):File{
+        val bitmap= BitmapFactory.decodeFile(mainFile.path)
+        val nh=( bitmap.height * (512.0 / bitmap.width) )
+        val newBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(newBitmap)
+        canvas.drawColor(Color.WHITE)
+        canvas.drawBitmap(bitmap, 0f, 0f, null)
+        val stream = FileOutputStream(newFile)
+        newBitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+        stream.close()
+        return newFile
+    }
+
+
+    fun getRealPath(
+        context: Context, uri: Uri
+    ): String? {
+        val contentResolver = context.contentResolver ?: return null
+        val name = contentResolver.getFileName(uri)
+        println("FILENAME=>$name")
+        // Create file path inside app's data dir
+        val filePath = (context.applicationInfo.dataDir + File.separator
+                + name)
+        val file = File(filePath)
+
+        try {
+            val inputStream = contentResolver.openInputStream(uri) ?: return null
+            val outputStream: OutputStream = FileOutputStream(file)
+            val buf = ByteArray(1024)
+            var len: Int
+            while (inputStream.read(buf).also { len = it } > 0) outputStream.write(buf, 0, len)
+            outputStream.close()
+            inputStream.close()
+        } catch (ignore: IOException) {
+            return null
+        }
+
+        return filePath
+    }
+
+    private fun ContentResolver.getFileName(fileUri: Uri): String {
+
+        var name = ""
+        val returnCursor = this.query(fileUri, null, null, null, null)
+
+        if (returnCursor != null) {
+
+            val nameIndex = returnCursor.getColumnIndex(
+
+                OpenableColumns.DISPLAY_NAME
+            )
+
+            returnCursor.moveToFirst()
+
+            name = returnCursor.getString(nameIndex)
+
+            returnCursor.close()
+
+        }
+
+        return URLEncoder.encode(name, "utf-8")
+
+    }
+
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            val heightRatio = (height.toFloat() / reqHeight.toFloat()).roundToInt()
+            val widthRatio = (width.toFloat() / reqWidth.toFloat()).roundToInt()
+            inSampleSize = if (heightRatio < widthRatio) heightRatio else widthRatio
+        }
+        val totalPixels = (width * height).toFloat()
+        val totalReqPixelsCap = (reqWidth * reqHeight * 2).toFloat()
+        while (totalPixels / (inSampleSize * inSampleSize) > totalReqPixelsCap) {
+            inSampleSize++
+        }
+        return inSampleSize
+    }
+
+
+    fun documentPickerIntent(currActivity: Activity, requestCode: Int) {
+        // File Types Allowed on Server ::  jpeg/png/jpg/pdf/doc/docx
+
+        val mimeTypes = arrayOf(
+            /*"application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  // .doc & .docx
+            "application/pdf",*/
+            "image/jpeg",
+            "image/png",
+            "image/jpg",
+        )
+
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+
+            type = "*/*"
+
+
+        }
+
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+        intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+        currActivity.startActivityForResult(intent, requestCode)
     }
 
 

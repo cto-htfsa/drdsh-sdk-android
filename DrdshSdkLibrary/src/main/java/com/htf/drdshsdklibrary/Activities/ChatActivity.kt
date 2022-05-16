@@ -14,10 +14,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
-import android.os.Build
-import android.os.Bundle
-import android.os.CountDownTimer
-import android.os.Environment
+import android.os.*
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Base64
@@ -42,28 +39,25 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.htf.drdshsdklibrary.Adapter.ChatAdapter
 import com.htf.drdshsdklibrary.Models.*
+import com.htf.drdshsdklibrary.Models.Message
 import com.htf.drdshsdklibrary.R
-import com.htf.drdshsdklibrary.Utills.AppUtils
-import com.htf.drdshsdklibrary.Utills.AppUtils.compressFile
+import com.htf.drdshsdklibrary.Utills.*
 import com.htf.drdshsdklibrary.Utills.AppUtils.getFileSize
 import com.htf.drdshsdklibrary.Utills.AppUtils.getMimeType
-import com.htf.drdshsdklibrary.Utills.Constants
 import com.htf.drdshsdklibrary.Utills.Constants.ACTION_AGENT_ACCEPT_CHAT_REQUEST
 import com.htf.drdshsdklibrary.Utills.Constants.AGENT_IS_TYPING
 import com.htf.drdshsdklibrary.Utills.Constants.AGENT_TYPING_START
 import com.htf.drdshsdklibrary.Utills.Constants.TYPE_DISLIKE
 import com.htf.drdshsdklibrary.Utills.Constants.TYPE_LIKE
-import com.htf.drdshsdklibrary.Utills.LocalizeActivity
+import com.htf.drdshsdklibrary.Utills.FileCompression.IImageCompressTaskListener
+import com.htf.drdshsdklibrary.Utills.FileCompression.ImageCompressTask
 import com.htf.learnchinese.utils.AppPreferences
 import com.htf.learnchinese.utils.AppSession
 import com.htf.learnchinese.utils.AppSession.Companion.mSocket
 import com.squareup.picasso.Picasso
 import droidninja.filepicker.BuildConfig
-import droidninja.filepicker.FilePickerBuilder
-import droidninja.filepicker.FilePickerConst
 import kotlinx.android.synthetic.main.activity_chat.*
 import kotlinx.android.synthetic.main.dialog_close_chat.view.*
-import kotlinx.android.synthetic.main.dialog_close_chat.view.btnCloseChat
 import kotlinx.android.synthetic.main.dialog_email.view.*
 import kotlinx.android.synthetic.main.dialog_for_offline_msg.view.*
 import kotlinx.android.synthetic.main.dialog_rate.view.*
@@ -73,26 +67,37 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import kotlin.collections.ArrayList
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
-class ChatActivity : LocalizeActivity(), View.OnClickListener{
-    private var message= Message()
+
+class ChatActivity : LocalizeActivity(), View.OnClickListener {
+    private var message = Message()
     private lateinit var mAdapter: ChatAdapter
-    private var agentAcceptChat= AgentAcceptChat()
-    private var currActivity:Activity=this
-    private var verifyIdentity:VerifyIdentity?=null
-    private var joinChatRoom:JoinChatRoom?=null
-    private var arrRandomId=ArrayList<String>()
-    private var arrMessage=ArrayList<Message>()
+    private var agentAcceptChat = AgentAcceptChat()
+    private var currActivity: Activity = this
+    private var verifyIdentity: VerifyIdentity? = null
+    private var joinChatRoom: JoinChatRoom? = null
+    private var arrRandomId = ArrayList<String>()
+    private var arrMessage = ArrayList<Message>()
 
-    private var unReadChatMsgId =""
-    private val REQUEST_CODE_PHOTO=101
-    var timer:CountDownTimer?=null
-    private var file:File?=null
+    private var unReadChatMsgId = ""
 
-    companion object{
-        fun open(currActivity: Activity){
-            val intent=Intent(currActivity,ChatActivity::class.java)
+    //    private val REQUEST_CODE_PHOTO = 101
+    var timer: CountDownTimer? = null
+    private var file: File? = null
+    private var imageCompressTask: ImageCompressTask? = null
+
+    private var _REQUEST_CODE_DOCUMENT = 8444
+    private var _UPLOAD_REQUEST_CODE = 0
+
+    //create a single thread pool to our image compression class.
+    private val mExecutorService: ExecutorService = Executors.newFixedThreadPool(1)
+
+
+    companion object {
+        fun open(currActivity: Activity) {
+            val intent = Intent(currActivity, ChatActivity::class.java)
             currActivity.startActivity(intent)
         }
     }
@@ -100,7 +105,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        verifyIdentity=AppPreferences.getInstance(currActivity).getIdentityDetails()
+        verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
         val window: Window = this.window
         window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
@@ -113,72 +118,84 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
         visitorLoadChatHistory()
 
 
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (joinChatRoom!=null){
-            if (joinChatRoom.visitorMessageId==null){
-                llWaiting.visibility=View.VISIBLE
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (joinChatRoom != null) {
+            if (joinChatRoom.visitorMessageId == null) {
+                llWaiting.visibility = View.VISIBLE
                 visitorMaxWaitTime()
-            } else{
-                llWaiting.visibility=View.GONE
+            } else {
+                llWaiting.visibility = View.GONE
             }
-         }
+        }
 
 
     }
 
     /* Set Embedded Chat Dynamic Data*/
-      private fun setEmbeddedChat(){
-          toolbar.setBackgroundColor(Color.parseColor(verifyIdentity?.embeddedChat?.topBarBgColor))
-          btnDropMsg.backgroundTintList = ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
-          btnRestartChat.backgroundTintList = ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
-           Picasso.get().load(Constants.ATTACHMENT_MESSAGE_URL+
-                 verifyIdentity?.embeddedChat?.messengerBodyImage)
-                .into(ivDrawable)
+    private fun setEmbeddedChat() {
+        toolbar.setBackgroundColor(Color.parseColor(verifyIdentity?.embeddedChat?.topBarBgColor))
+        btnDropMsg.backgroundTintList =
+            ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
+        btnRestartChat.backgroundTintList =
+            ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
+        Picasso.get().load(
+            Constants.ATTACHMENT_MESSAGE_URL +
+                    verifyIdentity?.embeddedChat?.messengerBodyImage
+        )
+            .into(ivDrawable)
     }
 
 
     override fun onClick(v: View?) {
-        when(v?.id){
-            R.id.iv_back->{
+        when (v?.id) {
+            R.id.iv_back -> {
                 finish()
             }
-            R.id.ivDislike->{
-                if(!isFinishing){
-                openRateDialog(TYPE_DISLIKE)}
+            R.id.ivDislike -> {
+                if (!isFinishing) {
+                    openRateDialog(TYPE_DISLIKE)
                 }
-            R.id.ivLike->{
-                if(!isFinishing){
-                    openRateDialog(TYPE_LIKE)}
+            }
+            R.id.ivLike -> {
+                if (!isFinishing) {
+                    openRateDialog(TYPE_LIKE)
                 }
-            R.id.ivMail->{
-                if(!isFinishing){
-                    openMailDialog(Constants.ALERT_TYPE_SEND_EMAIL,currActivity)}
+            }
+            R.id.ivMail -> {
+                if (!isFinishing) {
+                    openMailDialog(Constants.ALERT_TYPE_SEND_EMAIL, currActivity)
                 }
-            R.id.btnRestartChat->{
-                llWaiting.visibility=View.GONE
+            }
+            R.id.btnRestartChat -> {
+                llWaiting.visibility = View.GONE
                 arrMessage.clear()
                 restartChat()
             }
-            R.id.btnDropMsg->{
+            R.id.btnDropMsg -> {
                 arrMessage.clear()
                 invitationMaxWaitTimeExceeded()
             }
 
-            R.id.tvCloseChat->{
-                if(!isFinishing){
-                    openCloseChatDialog(Constants.ALERT_TYPE_CLOSE_CHAT,currActivity)}
-                }
-            R.id.ivSend->{
-                val message=etMessage.text.toString().trim()
-                if (message!=""){
-                    sendVisitorMessage(message,Constants.NORMAL_MESSAGE,null,null,null)
+            R.id.tvCloseChat -> {
+                if (!isFinishing) {
+                    openCloseChatDialog(Constants.ALERT_TYPE_CLOSE_CHAT, currActivity)
                 }
             }
-            R.id.ivAttachment->{
-                if (checkCameraPermission(currActivity, 100, null)){
-                      FilePickerBuilder.instance.setMaxCount(1)
-                    .setActivityTitle(getString(R.string.select_photo))
-                    .pickPhoto(this, REQUEST_CODE_PHOTO)
+            R.id.ivSend -> {
+                val message = etMessage.text.toString().trim()
+                if (message != "") {
+                    sendVisitorMessage(message, Constants.NORMAL_MESSAGE, null, null, null)
+                }
+            }
+            R.id.ivAttachment -> {
+                if (checkCameraPermission(currActivity, 100, null)) {
+                    AppUtils.documentPickerIntent(
+                        currActivity,
+                        _REQUEST_CODE_DOCUMENT
+                    )
+                    /*                   FilePickerBuilder.instance.setMaxCount(1)
+                                     .setActivityTitle(getString(R.string.select_photo))
+                                     .pickPhoto(this, REQUEST_CODE_PHOTO)*/
                 }
             }
         }
@@ -187,7 +204,8 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
     fun checkCameraPermission(
         activity: Activity,
         permissionCode: Int,
-        fragment: Fragment?): Boolean {
+        fragment: Fragment?
+    ): Boolean {
         val currentAPIVersion = Build.VERSION.SDK_INT
         return if (currentAPIVersion >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(
@@ -238,23 +256,30 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
         when (requestCode) {
             100 -> {
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
-                    FilePickerBuilder.instance.setMaxCount(1).setActivityTheme(R.style.AppTheme1)
-                        .setActivityTitle(getString(R.string.select_photo))
-                        .pickPhoto(this, REQUEST_CODE_PHOTO)
+                    AppUtils.documentPickerIntent(currActivity, _REQUEST_CODE_DOCUMENT)
+
+                    /*   FilePickerBuilder.instance.setMaxCount(1).setActivityTheme(R.style.AppTheme1)
+                           .setActivityTitle(getString(R.string.select_photo))
+                           .pickPhoto(this, REQUEST_CODE_PHOTO)*/
                 } else {
                     if (checkCameraPermission(currActivity, 100, null))
-                        FilePickerBuilder.instance.setMaxCount(1).setActivityTheme(R.style.AppTheme1)
-                            .setActivityTitle(getString(R.string.select_photo))
-                            .pickPhoto(this, REQUEST_CODE_PHOTO)
+
+                        AppUtils.documentPickerIntent(currActivity, _REQUEST_CODE_DOCUMENT)
+
+                    /*             FilePickerBuilder.instance.setMaxCount(1)
+                                         .setActivityTheme(R.style.AppTheme1)
+                                         .setActivityTitle(getString(R.string.select_photo))
+                                         .pickPhoto(this, REQUEST_CODE_PHOTO)*/
                 }
             }
+
         }
     }
 
 
-    private fun socketConnecting(){
+    private fun socketConnecting() {
         try {
-            if(mSocket ==null){
+            if (mSocket == null) {
                 mSocket = IO.socket("https://www.drdsh.live/")
                 mSocket!!.io().reconnection(false)
             }
@@ -262,34 +287,34 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             if (mSocket != null) {
                 if (!mSocket!!.connected()) {
                     mSocket!!.on(Socket.EVENT_CONNECT, onConnected)
-                    mSocket!!.on("disconnect",onDisconnect)
+                    mSocket!!.on("disconnect", onDisconnect)
                     mSocket!!.connect()
                 }
             }
 
             mSocket!!.on("totalOnlineAgents", totalOnlineAgents)
             mSocket!!.on("agentSendNewMessage", agentSendNewMessage)
-            mSocket!!.on("agentTypingListener",agentTypingListener)
-            mSocket!!.on("agentChatSessionTerminated",agentChatSessionTerminated)
+            mSocket!!.on("agentTypingListener", agentTypingListener)
+            mSocket!!.on("agentChatSessionTerminated", agentChatSessionTerminated)
             mSocket!!.on("agentAcceptedChatRequest", agentAcceptedChatRequest)
             mSocket!!.on("ipBlocked", agentIpBlockedRequest)
             mSocket!!.on("isDeliveredListener", isDeliveredListener)
             mSocket!!.on("isReadListener", isReadListener)
 
 
-        }catch (e:Exception){
+        } catch (e: Exception) {
             e.printStackTrace()
             e.printStackTrace()
         }
 
     }
-    private var onConnected: Emitter.Listener = Emitter.Listener{ args ->
 
+    private var onConnected: Emitter.Listener = Emitter.Listener { args ->
 
 
     }
 
-    private var onDisconnect: Emitter.Listener= Emitter.Listener { args ->
+    private var onDisconnect: Emitter.Listener = Emitter.Listener { args ->
         try {
             val data = if (args.isNotEmpty()) args[0]?.toString() else null
             runOnUiThread {
@@ -311,28 +336,29 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
         }
 
     }
-    private fun getData(){
-        verifyIdentity=AppPreferences.getInstance(currActivity).getIdentityDetails()
-        joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        when(verifyIdentity?.visitorConnectedStatus){
-            Constants.CHAT_IN_NORMAL_MODE->{
+
+    private fun getData() {
+        verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
+        joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        when (verifyIdentity?.visitorConnectedStatus) {
+            Constants.CHAT_IN_NORMAL_MODE -> {
                 // showWaitingMsg(true)
 
-             }
+            }
 
-            Constants.CHAT_IN_WAITING_MODE->{
+            Constants.CHAT_IN_WAITING_MODE -> {
 
-             }
+            }
 
-            Constants.CHAT_IN_CONNECTED_MODE->{
+            Constants.CHAT_IN_CONNECTED_MODE -> {
                 visitorJoinAgentRoom()
-                llAgent.visibility=View.VISIBLE
-                tvAgentName.text=joinChatRoom?.agentName.toString()
+                llAgent.visibility = View.VISIBLE
+                tvAgentName.text = joinChatRoom?.agentName.toString()
 
-              }
+            }
 
         }
-        
+
     }
 
     private fun setListener() {
@@ -345,7 +371,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
         tvCloseChat.setOnClickListener(this)
         ivSend.setOnClickListener(this)
         ivAttachment.setOnClickListener(this)
-        etMessage.addTextChangedListener(object :TextWatcher{
+        etMessage.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
 
             }
@@ -355,22 +381,22 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             }
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-                when(count){
-                    0->{
-                        val msg=getString(R.string.visto_stop_typing)
-                        val message=msg.replace("[X]",joinChatRoom?.name!!)
-                        visitorTyping(2,message,true)
+                val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+                when (count) {
+                    0 -> {
+                        val msg = getString(R.string.visto_stop_typing)
+                        val message = msg.replace("[X]", joinChatRoom?.name!!)
+                        visitorTyping(2, message, true)
                     }
-                    1->{
-                        val msg=getString(R.string.visitor_start_typing)
-                        val message=msg.replace("[X]",joinChatRoom?.name!!)
-                        visitorTyping(1,message,false)
+                    1 -> {
+                        val msg = getString(R.string.visitor_start_typing)
+                        val message = msg.replace("[X]", joinChatRoom?.name!!)
+                        visitorTyping(1, message, false)
                     }
-                    else->{
-                        val msg=getString(R.string.visitor_is_typing)
-                        val message=msg.replace("[X]",joinChatRoom?.name!!)
-                        visitorTyping(2,message,false)
+                    else -> {
+                        val msg = getString(R.string.visitor_is_typing)
+                        val message = msg.replace("[X]", joinChatRoom?.name!!)
+                        visitorTyping(2, message, false)
                     }
                 }
 
@@ -381,21 +407,21 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     }
 
-    private fun initRecycler(){
-        val mLayout=LinearLayoutManager(currActivity)
-        mAdapter= ChatAdapter(currActivity,arrMessage)
-        recycler.layoutManager=mLayout
-        recycler.adapter=mAdapter
-        etMessage.setOnFocusChangeListener{ v, hasFocus ->
+    private fun initRecycler() {
+        val mLayout = LinearLayoutManager(currActivity)
+        mAdapter = ChatAdapter(currActivity, arrMessage)
+        recycler.layoutManager = mLayout
+        recycler.adapter = mAdapter
+        etMessage.setOnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
-                if (arrMessage.size>0)
+                if (arrMessage.size > 0)
                     recycler.scrollToPosition(arrMessage.size - 1)
             }
         }
         recycler.addOnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             if (bottom < oldBottom) {
-                if(arrMessage.size>0){
-                    recycler.smoothScrollToPosition(arrMessage.size-1)
+                if (arrMessage.size > 0) {
+                    recycler.smoothScrollToPosition(arrMessage.size - 1)
                 }
             }
 
@@ -403,57 +429,79 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     }
 
-    private fun  openDropOfflineMessageDialog(dataMessage: String?) {
+    private fun openDropOfflineMessageDialog(dataMessage: String?) {
         try {
             val builder = AlertDialog.Builder(currActivity)
-            val dialogView = currActivity.layoutInflater.inflate(R.layout.dialog_for_offline_msg, null)
+            val dialogView =
+                currActivity.layoutInflater.inflate(R.layout.dialog_for_offline_msg, null)
             builder.setView(dialogView)
             builder.setCancelable(true)
             val dialog = builder.show()
-            var strName=""
-            var strEmail=""
-            var strMobile=""
-            var strSubject=""
-            var strMsg=""
+            var strName = ""
+            var strEmail = ""
+            var strMobile = ""
+            var strSubject = ""
+            var strMsg = ""
 
-            dialogView.btnSendMessage.backgroundTintList = ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
+            dialogView.btnSendMessage.backgroundTintList =
+                ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
 
             val myAnim = AnimationUtils.loadAnimation(currActivity, R.anim.slide_up)
             dialogView.startAnimation(myAnim)
 
 
-            dialogView.tvWaitingMessage.text=dataMessage
+            dialogView.tvWaitingMessage.text = dataMessage
 
             dialogView.btnSendMessage.setOnClickListener {
-                strName=dialogView.etFullName.text.toString().trim()
-                strEmail=dialogView.etEmail.text.toString().trim()
-                strMobile=dialogView.etMobile.text.toString().trim()
-                strSubject=dialogView.etSubject.text.toString().trim()
-                strMsg=dialogView.etQuestion.text.toString().trim()
+                strName = dialogView.etFullName.text.toString().trim()
+                strEmail = dialogView.etEmail.text.toString().trim()
+                strMobile = dialogView.etMobile.text.toString().trim()
+                strSubject = dialogView.etSubject.text.toString().trim()
+                strMsg = dialogView.etQuestion.text.toString().trim()
 
                 when {
-                    strName=="" -> {
-                        AppUtils.showToast(this.currActivity,getString(R.string.name_required),true)
+                    strName == "" -> {
+                        AppUtils.showToast(
+                            this.currActivity,
+                            getString(R.string.name_required),
+                            true
+                        )
 
                     }
-                    strEmail=="" -> {
-                        AppUtils.showToast(this.currActivity,getString(R.string.email_id_requied),true)
+                    strEmail == "" -> {
+                        AppUtils.showToast(
+                            this.currActivity,
+                            getString(R.string.email_id_requied),
+                            true
+                        )
 
                     }
-                    strMobile=="" -> {
-                        AppUtils.showToast(this.currActivity,getString(R.string.mobile_required),true)
+                    strMobile == "" -> {
+                        AppUtils.showToast(
+                            this.currActivity,
+                            getString(R.string.mobile_required),
+                            true
+                        )
 
                     }
-                    strSubject=="" -> {
-                        AppUtils.showToast(this.currActivity,getString(R.string.subject_required),true)
+                    strSubject == "" -> {
+                        AppUtils.showToast(
+                            this.currActivity,
+                            getString(R.string.subject_required),
+                            true
+                        )
 
                     }
-                    strMsg=="" -> {
-                        AppUtils.showToast(this.currActivity,getString(R.string.message_required),true)
+                    strMsg == "" -> {
+                        AppUtils.showToast(
+                            this.currActivity,
+                            getString(R.string.message_required),
+                            true
+                        )
 
                     }
                     else -> {
-                        sendOfflineMessage(dialog,strName,strEmail,strMobile,strSubject,strMsg)
+                        sendOfflineMessage(dialog, strName, strEmail, strMobile, strSubject, strMsg)
                     }
                 }
             }
@@ -461,19 +509,20 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             val window = dialog.window
             window!!.setLayout(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.MATCH_PARENT)
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
             window.setGravity(Gravity.CENTER)
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             dialog.show()
 
-        }catch (e:Exception){
+        } catch (e: Exception) {
 
         }
 
     }
 
 
-    private fun openRateDialog(type:Int){
+    private fun openRateDialog(type: Int) {
         try {
             val builder = AlertDialog.Builder(currActivity)
             val dialogView = currActivity.layoutInflater.inflate(R.layout.dialog_rate, null)
@@ -481,24 +530,25 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             builder.setCancelable(true)
             val dialog = builder.show()
 
-            dialogView.tvRate.backgroundTintList = ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
+            dialogView.tvRate.backgroundTintList =
+                ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
 
-            var feedbackStatus="Good"
-            var feedback=""
+            var feedbackStatus = "Good"
+            var feedback = ""
 
-            when(type){
-                TYPE_DISLIKE->{
+            when (type) {
+                TYPE_DISLIKE -> {
                     dialogView.ivLikeDislike.setImageResource(R.drawable.dislike)
-                    feedbackStatus="bed"
+                    feedbackStatus = "bed"
                 }
-                TYPE_LIKE->{
+                TYPE_LIKE -> {
                     dialogView.ivLikeDislike.setImageResource(R.drawable.like)
-                    feedbackStatus="Good"
+                    feedbackStatus = "Good"
                 }
             }
             dialogView.tvRate.setOnClickListener {
-                feedback=dialogView.etRate.text.toString().trim()
-                updateVisitorRating(feedback,dialog)
+                feedback = dialogView.etRate.text.toString().trim()
+                updateVisitorRating(feedback, dialog)
             }
 
 
@@ -511,7 +561,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             dialog.show()
 
-        }catch (e:Exception){
+        } catch (e: Exception) {
 
         }
 
@@ -525,70 +575,83 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             builder.setCancelable(true)
             val dialog = builder.show()
 
-            var feedbackStatus="Good"
-            var feedback=""
+            var feedbackStatus = "Good"
+            var feedback = ""
 
-            dialogView.btnCloseChat.backgroundTintList = ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
+            dialogView.btnCloseChat.backgroundTintList =
+                ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
 
             dialogView.ivThumbUp.setOnClickListener {
                 dialogView.ivThumbUp.setImageResource(R.drawable.thumbup)
                 dialogView.ivThumbDown.setImageResource(R.drawable.dislike)
-                feedbackStatus="Good"
+                feedbackStatus = "Good"
             }
 
             dialogView.ivThumbDown.setOnClickListener {
                 dialogView.ivThumbUp.setImageResource(R.drawable.like)
                 dialogView.ivThumbDown.setImageResource(R.drawable.thums_down)
-                feedbackStatus="bed"
+                feedbackStatus = "bed"
             }
             dialogView.btnCloseChat.setOnClickListener {
-                feedback=dialogView.etFeedback.text.toString().trim()
-                when(type){
-                    Constants.ALERT_TYPE_CLOSE_CHAT->{
-                        if (feedback!=""){
-                            visitorEndChatSession(feedbackStatus,feedback,dialog)
-                        }else{
-                            AppUtils.showToast(this.currActivity,getString(R.string.feedback_requied),true)
+                feedback = dialogView.etFeedback.text.toString().trim()
+                when (type) {
+                    Constants.ALERT_TYPE_CLOSE_CHAT -> {
+                        if (feedback != "") {
+                            visitorEndChatSession(feedbackStatus, feedback, dialog)
+                        } else {
+                            AppUtils.showToast(
+                                this.currActivity,
+                                getString(R.string.feedback_requied),
+                                true
+                            )
                         }
                     }
-                    Constants.ALERT_TYPE_CHAT_RATING->{
-                        updateVisitorRating(feedbackStatus,dialog)
+                    Constants.ALERT_TYPE_CHAT_RATING -> {
+                        updateVisitorRating(feedbackStatus, dialog)
                     }
                 }
             }
 
 
             val window = dialog.window
-            window!!.setLayout(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
+            window!!.setLayout(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
             window.setGravity(Gravity.BOTTOM)
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             dialog.show()
-        }catch (e:java.lang.Exception){
+        } catch (e: java.lang.Exception) {
 
         }
 
 
     }
 
-    private fun openMailDialog(type: Int, currActivity: Activity){
+    private fun openMailDialog(type: Int, currActivity: Activity) {
         try {
             val builder = AlertDialog.Builder(currActivity)
             val dialogView = currActivity.layoutInflater.inflate(R.layout.dialog_email, null)
             builder.setView(dialogView)
             builder.setCancelable(true)
             val dialog = builder.show()
-            var emailId=""
+            var emailId = ""
 
-            dialogView.tvEmailSend.backgroundTintList = ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
+            dialogView.tvEmailSend.backgroundTintList =
+                ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
 
             dialogView.tvEmailSend.setOnClickListener {
-                emailId=dialogView.etEmailId.text.toString().trim()
-                when(type){
-                    Constants.ALERT_TYPE_SEND_EMAIL->{
-                        if (emailId!=""){
-                            emailChatTranscript(emailId,dialog)
-                        }else{
-                            AppUtils.showToast(this.currActivity,getString(R.string.email_id_requied),true)
+                emailId = dialogView.etEmailId.text.toString().trim()
+                when (type) {
+                    Constants.ALERT_TYPE_SEND_EMAIL -> {
+                        if (emailId != "") {
+                            emailChatTranscript(emailId, dialog)
+                        } else {
+                            AppUtils.showToast(
+                                this.currActivity,
+                                getString(R.string.email_id_requied),
+                                true
+                            )
                         }
                     }
                 }
@@ -599,58 +662,61 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             }
 
             val window = dialog.window
-            window!!.setLayout(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
+            window!!.setLayout(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
             window.setGravity(Gravity.CENTER)
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             dialog.show()
-        }catch (e:Exception){
+        } catch (e: Exception) {
 
         }
 
 
-
     }
 
-    private fun showWaitingMsg(isFirstTime:Boolean){
+    private fun showWaitingMsg(isFirstTime: Boolean) {
         try {
-            if (isFirstTime){
-                val message1=Message()
-                message1.messageType=Constants.MESSAGE_TYPE_SENT
-                message1.message=joinChatRoom?.message!!
-                message1.isSystem=false
-                message1.createdAt=AppUtils.getCurrentTime()
+            if (isFirstTime) {
+                val message1 = Message()
+                message1.messageType = Constants.MESSAGE_TYPE_SENT
+                message1.message = joinChatRoom?.message!!
+                message1.isSystem = false
+                message1.createdAt = AppUtils.getCurrentTime()
                 arrMessage.add(message1)
             }
-            llBottomWaiting.visibility=View.GONE
-            val message2=Message()
-            message2.message=verifyIdentity?.embeddedChat?.onHoldMsg!!
-            message2.messageType=Constants.MESSAGE_TYPE_INFO
-            message2.isSystem=true
-            message2.messageInfoTypeShowLoading=true
+            llBottomWaiting.visibility = View.GONE
+            val message2 = Message()
+            message2.message = verifyIdentity?.embeddedChat?.onHoldMsg!!
+            message2.messageType = Constants.MESSAGE_TYPE_INFO
+            message2.isSystem = true
+            message2.messageInfoTypeShowLoading = true
             arrMessage.add(message2)
             mAdapter.notifyDataSetChanged()
-            recycler.smoothScrollToPosition(arrMessage.size-1)
-        }catch (e:Exception){
+            recycler.smoothScrollToPosition(arrMessage.size - 1)
+        } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    fun showResendOption(holder: ChatAdapter.InfoViewHolder,position:Int){
-        val time=verifyIdentity?.embeddedChat?.maxWaitTime?.toLong()!!*1000
-        if (timer==null){
-            timer=object :CountDownTimer(time,1000){
+    fun showResendOption(holder: ChatAdapter.InfoViewHolder, position: Int) {
+        val time = verifyIdentity?.embeddedChat?.maxWaitTime?.toLong()!! * 1000
+        if (timer == null) {
+            timer = object : CountDownTimer(time, 1000) {
                 override fun onFinish() {
-                    llBottomWaiting.visibility=View.VISIBLE
-                    btnDropMsg.visibility=View.VISIBLE
-                    val message=arrMessage[position]
-                    message.messageInfoTypeShowLoading=false
-                    message.message=getString(R.string.no_agent_available)
+                    llBottomWaiting.visibility = View.VISIBLE
+                    btnDropMsg.visibility = View.VISIBLE
+                    val message = arrMessage[position]
+                    message.messageInfoTypeShowLoading = false
+                    message.message = getString(R.string.no_agent_available)
                     arrMessage[position] = message
                     mAdapter.notifyItemChanged(position)
-                    timer=null
+                    timer = null
                 }
+
                 override fun onTick(millisUntilFinished: Long) {
-                    Log.e("SECOND:-","${millisUntilFinished*1000}")
+                    Log.e("SECOND:-", "${millisUntilFinished * 1000}")
                 }
 
             }.start()
@@ -658,49 +724,49 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     }
 
-    private fun visitorMaxWaitTime(){
-       val time=verifyIdentity?.embeddedChat?.maxWaitTime?.toLong()!!*1000
-       if (timer==null){
-           timer=object :CountDownTimer(time,1000){
-               override fun onFinish() {
-                   llBottomWaiting.visibility=View.VISIBLE
-                   llWaiting.visibility=View.GONE
-                   progressView.visibility=View.GONE
-                   btnDropMsg.visibility=View.VISIBLE
-                   tvWaitingMsg.text=getString(R.string.no_agent_available)
-                   timer=null
-               }
+    private fun visitorMaxWaitTime() {
+        val time = verifyIdentity?.embeddedChat?.maxWaitTime?.toLong()!! * 1000
+        if (timer == null) {
+            timer = object : CountDownTimer(time, 1000) {
+                override fun onFinish() {
+                    llBottomWaiting.visibility = View.VISIBLE
+                    llWaiting.visibility = View.GONE
+                    progressView.visibility = View.GONE
+                    btnDropMsg.visibility = View.VISIBLE
+                    tvWaitingMsg.text = getString(R.string.no_agent_available)
+                    timer = null
+                }
 
-               override fun onTick(millisUntilFinished: Long) {
-                   Log.e("SECOND:-","${millisUntilFinished*1000}")
-               }
+                override fun onTick(millisUntilFinished: Long) {
+                    Log.e("SECOND:-", "${millisUntilFinished * 1000}")
+                }
 
-           }.start()
-       }
+            }.start()
+        }
 
     }
 
-    private fun restartChat(){
+    private fun restartChat() {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
             userJson.put("_id", verifyIdentity.visitorID)
-            userJson.put("name",joinChatRoom.name)
-            userJson.put("email",joinChatRoom.email)
-            userJson.put("mobile",joinChatRoom.mobile)
-            userJson.put("message",joinChatRoom.message)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
-            val dialog=AppUtils.showProgress(currActivity)
+            userJson.put("name", joinChatRoom.name)
+            userJson.put("email", joinChatRoom.email)
+            userJson.put("mobile", joinChatRoom.mobile)
+            userJson.put("message", joinChatRoom.message)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
+            val dialog = AppUtils.showProgress(currActivity)
             mSocket!!.emit("inviteChat", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
-                        Log.d("inviteChat",data)
+                        Log.d("inviteChat", data)
                         dialog.dismiss()
                         runOnUiThread {
                             showWaitingMsg(false)
@@ -713,36 +779,36 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
         }
     }
 
-    private fun invitationMaxWaitTimeExceeded(){
+    private fun invitationMaxWaitTimeExceeded() {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
 
-            userJson.put("vid",verifyIdentity.visitorID)
-            userJson.put("form",verifyIdentity.embeddedChat!!.displayForm)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
+            userJson.put("vid", verifyIdentity.visitorID)
+            userJson.put("form", verifyIdentity.embeddedChat!!.displayForm)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("invitationMaxWaitTimeExceeded", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
-                            Log.d("updateVisitorRating",data)
-                            if(!isFinishing){
+                            Log.d("updateVisitorRating", data)
+                            if (!isFinishing) {
                                 openDropOfflineMessageDialog(data)
                             }
                         }
                     } catch (e: JSONException) {
                         e.printStackTrace()
                     }
-                } else{
+                } else {
                     try {
                         runOnUiThread {
-                            if(!isFinishing){
+                            if (!isFinishing) {
                                 openDropOfflineMessageDialog(data)
                             }
                         }
@@ -758,11 +824,12 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
     private val receiver = object : BroadcastReceiver() {
         @SuppressLint("SetTextI18n")
         override fun onReceive(context: Context, intent: Intent) {
-            Toast.makeText(context,"action:${intent.action}",Toast.LENGTH_SHORT).show()
-            when(intent.action){
-                ACTION_AGENT_ACCEPT_CHAT_REQUEST->{
-                    if (intent.hasExtra("agentAcceptedChat")){
-                        val agentAcceptChat=intent.getSerializableExtra("agentAcceptedChat") as AgentAcceptChat
+            Toast.makeText(context, "action:${intent.action}", Toast.LENGTH_SHORT).show()
+            when (intent.action) {
+                ACTION_AGENT_ACCEPT_CHAT_REQUEST -> {
+                    if (intent.hasExtra("agentAcceptedChat")) {
+                        val agentAcceptChat =
+                            intent.getSerializableExtra("agentAcceptedChat") as AgentAcceptChat
                         setAgentAcceptChatData(agentAcceptChat)
                     }
                 }
@@ -771,33 +838,35 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
     }
 
     private fun setAgentAcceptChatData(agentAcceptChat: AgentAcceptChat) {
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        joinChatRoom?.agentId=agentAcceptChat.agentId
-        joinChatRoom?.agentImage=agentAcceptChat.agentImage
-        joinChatRoom?.agentName=agentAcceptChat.agentName
-        joinChatRoom?.visitorMessageId=agentAcceptChat.vd!!.visitorMessageId
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        joinChatRoom?.agentId = agentAcceptChat.agentId
+        joinChatRoom?.agentImage = agentAcceptChat.agentImage
+        joinChatRoom?.agentName = agentAcceptChat.agentName
+        joinChatRoom?.visitorMessageId = agentAcceptChat.vd!!.visitorMessageId
         AppPreferences.getInstance(currActivity).saveJoinChatRoomDetails(joinChatRoom!!)
-        llBottomWaiting.visibility=View.GONE
-        llAgent.visibility=View.VISIBLE
-        tvAgentName.text=agentAcceptChat.agentName
-        if (timer!=null){
+        llBottomWaiting.visibility = View.GONE
+        llAgent.visibility = View.VISIBLE
+        tvAgentName.text = agentAcceptChat.agentName
+        if (timer != null) {
             timer?.cancel()
-            timer=null
+            timer = null
         }
 
-        val msg =arrMessage.filter { it.messageType == Constants.MESSAGE_TYPE_INFO }.filter { it.messageInfoTypeShowLoading }
-        if (msg.isNotEmpty()){
-            for (m in msg){
-                val position=arrMessage.indexOf(m)
+        val msg = arrMessage.filter { it.messageType == Constants.MESSAGE_TYPE_INFO }
+            .filter { it.messageInfoTypeShowLoading }
+        if (msg.isNotEmpty()) {
+            for (m in msg) {
+                val position = arrMessage.indexOf(m)
                 arrMessage.removeAt(position)
                 mAdapter.notifyDataSetChanged()
             }
         }
 
-        val msg1=arrMessage.filter { it.messageType == Constants.MESSAGE_TYPE_INFO }.filter { it.message==getString(R.string.no_agent_available) }
-        if (msg1.isNotEmpty()){
-            for (m in msg1){
-                val position=arrMessage.indexOf(m)
+        val msg1 = arrMessage.filter { it.messageType == Constants.MESSAGE_TYPE_INFO }
+            .filter { it.message == getString(R.string.no_agent_available) }
+        if (msg1.isNotEmpty()) {
+            for (m in msg1) {
+                val position = arrMessage.indexOf(m)
                 arrMessage.removeAt(position)
                 mAdapter.notifyDataSetChanged()
             }
@@ -813,17 +882,15 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             currActivity.runOnUiThread {
                 if (data != null) {
                     Log.e("agentSendNewMessage", data)
-                    val type=object :TypeToken<Message>(){}.type
-                     message=Gson().fromJson<Message>(data,type)
-                    unReadChatMsgId=message.id!!
-                    if (message.companyId==verifyIdentity?.companyId){
-                        if (!arrMessage.filter { it.id == message.id }.isNotEmpty()){
-                            arrMessage.add(message)
-                            mAdapter.notifyDataSetChanged()
-                            recycler.scrollToPosition(arrMessage.size-1)
-                            llTyping.visibility=View.GONE
+                    val type = object : TypeToken<Message>() {}.type
+                    message = Gson().fromJson<Message>(data, type)
+                    unReadChatMsgId = message.id!!
+                    if (!arrMessage.filter { it.id == message.id }.isNotEmpty()) {
+                        arrMessage.add(message)
+                        mAdapter.notifyDataSetChanged()
+                        recycler.scrollToPosition(arrMessage.size - 1)
+                        llTyping.visibility = View.GONE
 
-                        }
                     }
 
                 }
@@ -840,20 +907,21 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             currActivity.runOnUiThread {
                 if (data != null) {
                     Log.e("agentTypingListener", data)
-                    val type=object:TypeToken<AgentTyping>(){}.type
-                    val agentTyping=Gson().fromJson<AgentTyping>(data,type)
-                    if (agentTyping.vid==verifyIdentity?.visitorID){
-                        Picasso.get().load(Constants.AGENT_IMAGE_URL+joinChatRoom?.agentImage).placeholder(R.drawable.user).into(ivAgentTyping)
-                        tvAgentTyping.text=agentTyping.message
-                        when(agentTyping.ts){
-                            AGENT_TYPING_START->{
-                                llTyping.visibility=View.VISIBLE
+                    val type = object : TypeToken<AgentTyping>() {}.type
+                    val agentTyping = Gson().fromJson<AgentTyping>(data, type)
+                    if (agentTyping.vid == verifyIdentity?.visitorID) {
+                        Picasso.get().load(Constants.AGENT_IMAGE_URL + joinChatRoom?.agentImage)
+                            .placeholder(R.drawable.user).into(ivAgentTyping)
+                        tvAgentTyping.text = agentTyping.message
+                        when (agentTyping.ts) {
+                            AGENT_TYPING_START -> {
+                                llTyping.visibility = View.VISIBLE
                             }
-                            AGENT_IS_TYPING->{
-                                if (agentTyping?.stop!!){
-                                    llTyping.visibility=View.GONE
-                                }else{
-                                    llTyping.visibility=View.VISIBLE
+                            AGENT_IS_TYPING -> {
+                                if (agentTyping?.stop!!) {
+                                    llTyping.visibility = View.GONE
+                                } else {
+                                    llTyping.visibility = View.VISIBLE
                                 }
                             }
                         }
@@ -872,19 +940,19 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             currActivity.runOnUiThread {
                 if (data != null) {
                     Log.e("agentChatTerminated", data)
-                    val type=object :TypeToken<AgentChatTerminate>(){}.type
-                    val agentChatTerminate=Gson().fromJson<AgentChatTerminate>(data,type)
-                    val message=Message()
+                    val type = object : TypeToken<AgentChatTerminate>() {}.type
+                    val agentChatTerminate = Gson().fromJson<AgentChatTerminate>(data, type)
+                    val message = Message()
                     message.apply {
-                        message.message=agentChatTerminate.message
-                        message.messageType=Constants.MESSAGE_TYPE_INFO
-                        message.isSystem=true
+                        message.message = agentChatTerminate.message
+                        message.messageType = Constants.MESSAGE_TYPE_INFO
+                        message.isSystem = true
                     }
                     arrMessage.add(message)
                     mAdapter.notifyDataSetChanged()
-                    recycler.smoothScrollToPosition(arrMessage.size-1)
-                    llBottomWaiting.visibility=View.VISIBLE
-                    btnDropMsg.visibility=View.VISIBLE
+                    recycler.smoothScrollToPosition(arrMessage.size - 1)
+                    llBottomWaiting.visibility = View.VISIBLE
+                    btnDropMsg.visibility = View.VISIBLE
                     openCloseChatDialog(Constants.ALERT_TYPE_CHAT_RATING, currActivity)
                 }
             }
@@ -900,9 +968,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             currActivity.runOnUiThread {
                 if (data != null) {
                     Log.e("agentAcceptedChat", data)
-                    llWaiting.visibility=View.GONE
-                    val type=object :TypeToken<AgentAcceptChat>(){}.type
-                    agentAcceptChat=Gson().fromJson<AgentAcceptChat>(data,type)
+                    llWaiting.visibility = View.GONE
+                    val type = object : TypeToken<AgentAcceptChat>() {}.type
+                    agentAcceptChat = Gson().fromJson<AgentAcceptChat>(data, type)
                     setAgentAcceptChatData(agentAcceptChat)
 
                 }
@@ -934,7 +1002,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             currActivity.runOnUiThread {
                 if (data != null) {
                     Log.e("totalOnlineAgents", data)
-                } else{
+                } else {
                     Log.e("totalOnlineAgents", data)
                 }
             }
@@ -951,36 +1019,45 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             try {
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
-                    // Log.e("response", data
-                    val chat = Gson().fromJson(data, Message::class.java)
-                    if (chat.deliveredAt!=null) {
-                        arrMessage.filter {it.id==chat.id}.forEach {
-                            it.deliveredAt=chat.deliveredAt
-                            it.message=chat.message!!
-                        }
+                     Log.e("delivered_response",data)
+
+                    val jsonObject = JSONObject(data)
+                    val chatId = jsonObject.optString("_id")
+                    val chatDeliveredAt = jsonObject.optString("deliveredAt")
+                    val chatMessage = jsonObject.optString("message")
+
+                    val position = arrMessage.withIndex().find { it.value.id == chatId }?.index
+                    position?.run {
+                        arrMessage[this].deliveredAt = chatDeliveredAt
+                        arrMessage[this].message = chatMessage
+                        mAdapter.notifyItemChanged(this)
+
                     }
-                    mAdapter.notifyDataSetChanged()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
+
     //Read Listener
     private var isReadListener: Emitter.Listener = Emitter.Listener { args ->
         currActivity.runOnUiThread {
             try {
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
-                    // Log.e("response", data
-                    val chat = Gson().fromJson(data, Message::class.java)
-                    if (chat.readAt!=null) {
-                        arrMessage.filter {it.id==chat.id }.forEach {
-                            it.readAt=chat.readAt
-                            it.message=chat.message!!
-                        }
+                        Log.e("response readListener",data)
+                    val jsonObject = JSONObject(data)
+                    val chatId = jsonObject.optString("_id")
+                    val chatReadAt = jsonObject.optString("readAt")
+                    val chatMessage = jsonObject.optString("message")
+                    val position = arrMessage.withIndex().find { it.value.id == chatId }?.index
+                    position?.run {
+                        arrMessage[this].readAt = chatReadAt
+                        arrMessage[this].message = chatMessage
+                        mAdapter.notifyItemChanged(this)
+
                     }
-                    mAdapter.notifyDataSetChanged()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -990,40 +1067,46 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
     }
 
 
-    private fun visitorEndChatSession(feedbackStatus: String, feedback: String, dialog: AlertDialog){
+
+    private fun visitorEndChatSession(
+        feedbackStatus: String,
+        feedback: String,
+        dialog: AlertDialog
+    ) {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
-            userJson.put("vid",verifyIdentity.visitorID)
-            userJson.put("id",verifyIdentity.companyId)
-            userJson.put("name",joinChatRoom.name)
-            userJson.put("comment",feedback)
-            userJson.put("feedback",feedbackStatus)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
+            userJson.put("vid", verifyIdentity.visitorID)
+            userJson.put("id", verifyIdentity.companyId)
+            userJson.put("name", joinChatRoom.name)
+            userJson.put("comment", feedback)
+            userJson.put("feedback", feedbackStatus)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("visitorEndChatSession", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
-                            Log.d("visitorEndChatSession",data)
-                            val type=object :TypeToken<VisitorChatTerminate>(){}.type
-                            val visitorChatTerminate=Gson().fromJson<VisitorChatTerminate>(data,type)
-                            val message=Message()
+                            Log.d("visitorEndChatSession", data)
+                            val type = object : TypeToken<VisitorChatTerminate>() {}.type
+                            val visitorChatTerminate =
+                                Gson().fromJson<VisitorChatTerminate>(data, type)
+                            val message = Message()
                             message.apply {
-                                message.message=visitorChatTerminate.message
-                                message.messageType=Constants.MESSAGE_TYPE_INFO
-                                message.isSystem=true
+                                message.message = visitorChatTerminate.message
+                                message.messageType = Constants.MESSAGE_TYPE_INFO
+                                message.isSystem = true
                             }
                             arrMessage.add(message)
                             mAdapter.notifyDataSetChanged()
-                            recycler.smoothScrollToPosition(arrMessage.size-1)
-                            llBottomWaiting.visibility=View.VISIBLE
-                            btnDropMsg.visibility=View.VISIBLE
+                            recycler.smoothScrollToPosition(arrMessage.size - 1)
+                            llBottomWaiting.visibility = View.VISIBLE
+                            btnDropMsg.visibility = View.VISIBLE
                             dialog.dismiss()
                         }
 
@@ -1036,28 +1119,28 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     }
 
-    private fun visitorLoadChatHistory(){
+    private fun visitorLoadChatHistory() {
         /* if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }*/
 
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
-            userJson.put("mid",joinChatRoom.visitorMessageId)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
+            userJson.put("mid", joinChatRoom.visitorMessageId)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("visitorLoadChatHistory", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
-                            Log.d("visitorLoadChatHistory",data)
-                            val type=object :TypeToken<ArrayList<Message>>(){}.type
+                            Log.d("visitorLoadChatHistory", data)
+                            val type = object : TypeToken<ArrayList<Message>>() {}.type
                             arrMessage.clear()
-                            arrMessage.addAll(Gson().fromJson<ArrayList<Message>>(data,type))
-                            arrMessage.filter { it.agentId!=null }
+                            arrMessage.addAll(Gson().fromJson<ArrayList<Message>>(data, type))
+                            arrMessage.filter { it.agentId != null }
                             mAdapter.notifyDataSetChanged()
                             recycler.scrollToPosition(arrMessage.size - 1)
                             getData()
@@ -1070,26 +1153,26 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
         }
     }
 
-    private fun updateVisitorRating(feedback: String, dialog: AlertDialog){
+    private fun updateVisitorRating(feedback: String, dialog: AlertDialog) {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
 
-            userJson.put("mid",joinChatRoom.visitorMessageId)
-            userJson.put("vid",verifyIdentity.visitorID)
-            userJson.put("feedback",feedback)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
+            userJson.put("mid", joinChatRoom.visitorMessageId)
+            userJson.put("vid", verifyIdentity.visitorID)
+            userJson.put("feedback", feedback)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("updateVisitorRating", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
-                            Log.d("updateVisitorRating",data)
+                            Log.d("updateVisitorRating", data)
                             dialog.dismiss()
                         }
                     } catch (e: JSONException) {
@@ -1101,26 +1184,26 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     }
 
-    private fun emailChatTranscript(emailId: String, dialog: AlertDialog){
+    private fun emailChatTranscript(emailId: String, dialog: AlertDialog) {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
 
-            userJson.put("mid",joinChatRoom.visitorMessageId)
-            userJson.put("vid",verifyIdentity.visitorID)
-            userJson.put("email",emailId)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
+            userJson.put("mid", joinChatRoom.visitorMessageId)
+            userJson.put("vid", verifyIdentity.visitorID)
+            userJson.put("email", emailId)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("emailChatTranscript", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
-                            Log.d("updateVisitorRating",data)
+                            Log.d("updateVisitorRating", data)
                             dialog.dismiss()
                         }
                     } catch (e: JSONException) {
@@ -1148,19 +1231,19 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
         if (verifyIdentity != null) {
             val userJson = JSONObject()
             userJson.put("_id", verifyIdentity.visitorID)
-            userJson.put("name",strName)
-            userJson.put("email",strEmail)
-            userJson.put("mobile",strMobile)
-            userJson.put("message",strMsg)
-            userJson.put("subject",strSubject)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
+            userJson.put("name", strName)
+            userJson.put("email", strEmail)
+            userJson.put("mobile", strMobile)
+            userJson.put("message", strMsg)
+            userJson.put("subject", strSubject)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("submitOfflineMessage", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 runOnUiThread {
                     if (data != null) {
                         try {
-                            Log.d("inviteChat",data)
+                            Log.d("inviteChat", data)
                             dialog.dismiss()
                             currActivity.finish()
                         } catch (e: JSONException) {
@@ -1174,22 +1257,21 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
     }
 
 
-
-    private fun visitorJoinAgentRoom(){
+    private fun visitorJoinAgentRoom() {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetailsInString()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetailsInString()
+        if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject(joinChatRoom)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("visitorJoinAgentRoom", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
-                        Log.d("visitorJoinAgentRoom",data)
+                        Log.d("visitorJoinAgentRoom", data)
                     } catch (e: JSONException) {
                         e.printStackTrace()
                     }
@@ -1199,100 +1281,121 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     }
 
-    private fun visitorTyping(ts:Int,message:String,stop:Boolean){
+    private fun visitorTyping(ts: Int, message: String, stop: Boolean) {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
-            userJson.put("vid",verifyIdentity.visitorID)
-            userJson.put("id",verifyIdentity.companyId)
-            userJson.put("agent_id",joinChatRoom.agentId)
-            userJson.put("ts",ts)
-            userJson.put("message",message)
-            userJson.put("stop",stop)
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
 
-            mSocket!!.emit("visitorTyping", userJson, Ack { args ->
+            /*   vid: (VISITOR ID),
+               id: (Company ID),
+               agent_id: (AGENT ID),
+               ts: (When start typing then 1 and continue typing 2, and when stop typing then pass 0),
+               message: `virendra start typing...` when continues typing `virendra is typing...`,
+               stop: when stop typing then true else false
+               "appSid": "5def86cf64be6d13f55f2034.5d96941bb5507599887b9c71829d5cffcdf55014",
+               "device" : "android/ios/web/windows/linux"
+               */
+
+            userJson.put("vid", verifyIdentity.visitorID)
+            userJson.put("id", verifyIdentity.companyId)
+            userJson.put("agent_id", joinChatRoom.agentId)
+            userJson.put("ts", ts)
+            userJson.put("message", message)
+            userJson.put("stop", stop)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
+
+            mSocket?.emit("visitorTyping", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
-                if (data != null) {
-                    try {
-                        Log.d("visitorTyping",data)
-                    } catch (e: JSONException) {
-                        e.printStackTrace()
+                currActivity.runOnUiThread {
+                    if (data != null) {
+                        try {
+                            Log.d("visitorTyping", data)
+                        } catch (e: JSONException) {
+                            e.printStackTrace()
+                        }
                     }
                 }
+
             })
         }
 
     }
 
-    private fun sendVisitorMessage(message: String,isAttachment:Int,attachmentFile:String?,fileType:String?,fileSize:String?){
+    private fun sendVisitorMessage(
+        message: String,
+        isAttachment: Int,
+        attachmentFile: String?,
+        fileType: String?,
+        fileSize: String?
+    ) {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
         }
 
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
-        if (verifyIdentity != null && joinChatRoom!=null) {
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        if (verifyIdentity != null && joinChatRoom != null) {
             //for typing event...................
-            val msg=getString(R.string.visto_stop_typing)
-            val text=msg.replace("[X]",joinChatRoom.name!!)
-            visitorTyping(2,text,true)
+            val msg = getString(R.string.visto_stop_typing)
+            val text = msg.replace("[X]", joinChatRoom.name!!)
+            visitorTyping(2, text, true)
 
             //...............................................................
-            val randomId=generateRandomId()
+            val randomId = generateRandomId()
             val userJson = JSONObject()
-            userJson.put("dc_id",verifyIdentity.companyId)
-            userJson.put("dc_vid",verifyIdentity.visitorID)
-            if (joinChatRoom.agentId!=null){
-                userJson.put("dc_agent_id",joinChatRoom.agentId)
-            }else{
-                userJson.put("dc_agent_id","")
+            userJson.put("dc_id", verifyIdentity.companyId)
+            userJson.put("dc_vid", verifyIdentity.visitorID)
+            if (joinChatRoom.agentId != null) {
+                userJson.put("dc_agent_id", joinChatRoom.agentId)
+            } else {
+                userJson.put("dc_agent_id", "")
             }
-            userJson.put("dc_mid",joinChatRoom.visitorMessageId)
-            userJson.put("dc_name",joinChatRoom.name)
-            userJson.put("send_by",2)
-            userJson.put("message",message)
-            userJson.put("localId",randomId)
-            userJson.put("is_attachment",isAttachment)
-            if (isAttachment==Constants.ATTACHMENT_MESSAGE){
-                userJson.put("attachment_file",attachmentFile)
-                userJson.put("file_type",fileType)
-                userJson.put("file_size",fileSize)
+            userJson.put("dc_mid", joinChatRoom.visitorMessageId)
+            userJson.put("dc_name", joinChatRoom.name)
+            userJson.put("send_by", 2)
+            userJson.put("message", message)
+            userJson.put("localId", randomId)
+            userJson.put("is_attachment", isAttachment)
+            if (isAttachment == Constants.ATTACHMENT_MESSAGE) {
+                userJson.put("attachment_file", attachmentFile)
+                userJson.put("file_type", fileType)
+                userJson.put("file_size", fileSize)
             }
-            userJson.put("appSid",AppSession.appSid)
-            userJson.put("device",AppSession.deviceType)
+            userJson.put("appSid", AppSession.appSid)
+            userJson.put("device", AppSession.deviceType)
 
             //for show message locally
-            addLocal(message,randomId,isAttachment,file,fileType,fileSize)
+            addLocal(message, randomId, isAttachment, file, fileType, fileSize)
 
             mSocket!!.emit("sendVisitorMessage", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
-                            Log.d("sendVisitorMessage",data)
-                            val type=object :TypeToken<Message>(){}.type
-                            val msg=Gson().fromJson<Message>(data,type)
-                            for(id in arrRandomId){
-                                if (id==msg.localId){
-                                    arrMessage.filter { it.isLocal}.filter { it.localId==id }.forEach {
-                                        it.isLocal=true
-                                        it.message=msg.message
-                                        unReadChatMsgId=msg.id!!
-                                    }
+                            Log.d("sendVisitorMessage", data)
+                            val type = object : TypeToken<Message>() {}.type
+                            val msg = Gson().fromJson<Message>(data, type)
+                            for (id in arrRandomId) {
+                                if (id == msg.localId) {
+                                    arrMessage.filter { it.isLocal }.filter { it.localId == id }
+                                        .forEach {
+                                            it.isLocal = true
+                                            it.message = msg.message
+                                            unReadChatMsgId = msg.id!!
+                                        }
                                     mAdapter.notifyDataSetChanged()
                                     arrRandomId.remove(id)
                                 }
                             }
 
-                            for (i in 0.until(arrMessage.size)){
-                                if(arrMessage[i].readAt==null){
-                                    unReadChatMsgId=arrMessage[i].id!!
+                            for (i in 0.until(arrMessage.size)) {
+                                if (arrMessage[i].readAt == null) {
+                                    unReadChatMsgId = arrMessage[i].id!!
                                     isReadToUserEmitter()
                                 }
                             }
@@ -1308,23 +1411,26 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     }
 
-    private fun addLocal(msg: String, localId: String, attachment: Int, file: File?, fileType: String?,
-                         fileSize: String?) { val message=Message()
-        message.isLocal=true
-        message.sendBy=2
-        message.isSystem=false
-        message.createdAt=AppUtils.getCurrentTime()
-        message.localId=localId
-        message.isAttachment=attachment
-        if (attachment==Constants.ATTACHMENT_MESSAGE){
-            message.tempFile=file
-            message.fileType=fileType
+    private fun addLocal(
+        msg: String, localId: String, attachment: Int, file: File?, fileType: String?,
+        fileSize: String?
+    ) {
+        val message = Message()
+        message.isLocal = true
+        message.sendBy = 2
+        message.isSystem = false
+        message.createdAt = AppUtils.getCurrentTime()
+        message.localId = localId
+        message.isAttachment = attachment
+        if (attachment == Constants.ATTACHMENT_MESSAGE) {
+            message.tempFile = file
+            message.fileType = fileType
         }
-        message.message=msg
+        message.message = msg
         arrRandomId.add(localId)
         arrMessage.add(message)
         mAdapter.notifyDataSetChanged()
-        recycler.smoothScrollToPosition(arrMessage.size-1)
+        recycler.smoothScrollToPosition(arrMessage.size - 1)
         etMessage.setText("")
     }
 
@@ -1355,26 +1461,19 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     }
 
-    override fun onPause() {
-        super.onPause()
-        /*  LocalBroadcastManager.
-          getInstance(currActivity).
-          unregisterReceiver(receiver)*/
-    }
-
     fun downloadImageFile(
         context: Activity,
         url: String,
-        fileName: String,holder:ChatAdapter.ReceivedViewHolder
+        fileName: String, holder: ChatAdapter.ReceivedViewHolder
     ) {
 
-        val folderPath=File(Environment.getExternalStorageDirectory(),"Drdsh")
-        if(!folderPath.exists()){
+        val folderPath = File(Environment.getExternalStorageDirectory(), "Drdsh")
+        if (!folderPath.exists()) {
             folderPath.mkdir()
         }
 
-        val mediaPath=File(folderPath,"Media")
-        if (!mediaPath.exists()){
+        val mediaPath = File(folderPath, "Media")
+        if (!mediaPath.exists()) {
             mediaPath.mkdir()
         }
 
@@ -1394,15 +1493,20 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
             return
         }
 
-        holder.itemView.ivIncomingImageDownload.visibility=View.GONE
-        holder.itemView.pbIncomingImage.visibility=View.VISIBLE
+        holder.itemView.ivIncomingImageDownload.visibility = View.GONE
+        holder.itemView.pbIncomingImage.visibility = View.VISIBLE
 
         val dmRequest = DownloadManager.Request(Uri.parse(url))
         dmRequest.setTitle(fileName)
         dmRequest.setDescription(context.getString(R.string.downloading))
         dmRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
         dmRequest.setDestinationInExternalPublicDir(
-            "Drdsh/Media",
+            Environment.DIRECTORY_DOWNLOADS,
+            File.separator + fileName
+        )
+        dmRequest.setDestinationInExternalFilesDir(
+            context,
+            Environment.DIRECTORY_DOWNLOADS,
             fileName
         )
         dmRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE or DownloadManager.Request.NETWORK_WIFI)
@@ -1421,7 +1525,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
                 if (c.moveToFirst()) {
                     val status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS))
                     if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                        holder.itemView.pbIncomingImage.visibility=View.GONE
+                        holder.itemView.pbIncomingImage.visibility = View.GONE
                         mAdapter.notifyDataSetChanged()
                     }
                 }
@@ -1432,40 +1536,100 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
         dm.enqueue(dmRequest)
     }
 
+    private fun uploadFile(file: File) {
+        val bytes = file.readBytes()
+        val base64 = Base64.encodeToString(bytes, 0)
+        val mime_type = getMimeType(Uri.fromFile(file), currActivity)
+        val fileSize = getFileSize(Uri.fromFile(file).scheme!!, Uri.fromFile(file), currActivity)
+        val destinationFile =
+            File(currActivity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), file!!.name)
+        val source = FileInputStream(file).channel
+        val destination = FileOutputStream(destinationFile).channel
+        if (destination != null && source != null) {
+            destination.transferFrom(source, 0, source.size())
+        }
+        source?.close()
+        destination?.close()
+
+        Log.e("MIME_TYPE", mime_type)
+        Log.e("FILE_SIZE", "${fileSize}")
+        Log.e("BASE_64", base64)
+        Log.e("FILE_NAME", file!!.name)
+        sendVisitorMessage(
+            file!!.name,
+            Constants.ATTACHMENT_MESSAGE,
+            base64,
+            mime_type,
+            fileSize.toString()
+        )
+    }
+
+    //image compress task callback
+    private val iImageCompressTaskListener: IImageCompressTaskListener =
+        object :
+            IImageCompressTaskListener {
+            override fun onComplete(compressed: List<File>) {
+                //photo compressed. Yay!
+
+                //prepare for uploads. Use an Http library like Retrofit, Volley or async-http-client (My favourite)
+                val file = compressed[0]
+                Log.d("ImageCompressor", "New photo size ==> " + file.length()) //log new file size.
+                uploadFile(file)
+
+
+            }
+
+            override fun onError(error: Throwable) {
+                //very unlikely, but it might happen on a device with extremely low storage.
+                //log it, log.WhatTheFuck?, or show a dialog asking the user to delete some files....etc, etc
+                Log.wtf("ImageCompressor", "Error occurred", error)
+            }
+        }
+
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
-        when(requestCode){
-            REQUEST_CODE_PHOTO->{
-                if (data!=null && resultCode==Activity.RESULT_OK){
-                    try {
-                        val dataList=data.getStringArrayListExtra(FilePickerConst.KEY_SELECTED_MEDIA)!!
-                        val pickerFile=File(dataList[0])
-                        file=compressFile(pickerFile)
-                        val bytes = file?.readBytes()
-                        val base64 = Base64.encodeToString(bytes,0)
-                        val mime_type=getMimeType(Uri.fromFile(file),currActivity)
-                        val fileSize=getFileSize(Uri.fromFile(file).scheme!!,Uri.fromFile(file),currActivity)
+        when (requestCode) {
+            /*     REQUEST_CODE_PHOTO -> {
+                     if (data != null && resultCode == Activity.RESULT_OK) {
+                         try {
+                             val dataList =
+                                 data.getStringArrayListExtra(FilePickerConst.KEY_SELECTED_MEDIA)!!
+                             val file = File(dataList[0])
+                             val uri = Uri.fromFile(file)
 
-                        val destinationFile=File(currActivity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),file!!.name)
-                        val source=FileInputStream(file).channel
-                        val destination=FileOutputStream(destinationFile).channel
-                        if (destination != null && source != null) {
-                            destination.transferFrom(source, 0, source.size());
+                             val path = AppUtils.getRealPath(currActivity, uri)
+
+                         } catch (e: Exception) {
+                             e.printStackTrace()
+
+                         }
+
+                     }
+                 }*/
+
+            _REQUEST_CODE_DOCUMENT -> {
+                if (data != null && Activity.RESULT_OK == resultCode) {
+                    _UPLOAD_REQUEST_CODE = requestCode
+                    val uri = data.data
+                    uri?.run {
+                        val realPath =
+                            AppUtils.getRealPath(currActivity, this)
+                        realPath?.let {
+                            file = File(it)
+                            file?.let { fileIt ->
+                                //Create ImageCompressTask and execute with Executor.
+                                imageCompressTask =
+                                    ImageCompressTask(
+                                        currActivity,
+                                        it,
+                                        iImageCompressTaskListener
+                                    )
+                                mExecutorService.execute(imageCompressTask)
+                            }
                         }
-                        source?.close()
-                        destination?.close()
-
-                        Log.e("MIME_TYPE",mime_type)
-                        Log.e("FILE_SIZE","${fileSize}")
-                        Log.e("BASE_64",base64)
-                        Log.e("FILE_NAME", file!!.name)
-                        sendVisitorMessage(file!!.name,Constants.ATTACHMENT_MESSAGE,base64,mime_type,fileSize.toString())
-                    } catch (e:Exception){
-
                     }
-
                 }
             }
         }
@@ -1475,7 +1639,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     // Message Delivered to User Using Emitter
     private fun isDeliveredToUserEmitter() {
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
 
         if (joinChatRoom != null) {
             val userJson = JSONObject()
@@ -1500,7 +1664,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener{
 
     //Message Read By User Using Emitter
     private fun isReadToUserEmitter() {
-        val joinChatRoom=AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
 
         if (joinChatRoom != null) {
             val userJson = JSONObject()

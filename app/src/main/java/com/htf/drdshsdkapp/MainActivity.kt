@@ -12,12 +12,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-       val deviceId = Settings.Secure.getString(
-            this.contentResolver,
-            Settings.Secure.ANDROID_ID)!!
-
-        UserDetailActivity.open(currActivity = this, appSid ="YOUR APP SID", locale = "en",
+        val deviceId = Settings.Secure.getString(this.contentResolver, Settings.Secure.ANDROID_ID)
+        UserDetailActivity.open(
+            currActivity = this,
+            appSid = "YOUR APP_S_ID",
+            locale = "en",
             deviceID = deviceId,
-        domain = "YOUR DOMAIN URL")
+            domain = "YOUR_DOMAIN_NAME"
+        )
     }
 }
