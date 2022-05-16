@@ -14,7 +14,7 @@ import com.squareup.picasso.Picasso
 import java.io.File
 
 
-class PhotoFullPopupWindow(rootView: View, file: File, currActivity: Activity) :
+class PhotoFullPopupWindow(rootView: View, file: File?=null, currActivity: Activity, imageUrl: String?=null) :
     PopupWindow(
         (currActivity.getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater).inflate(
             R.layout.popup_photo_full,
@@ -44,34 +44,42 @@ class PhotoFullPopupWindow(rootView: View, file: File, currActivity: Activity) :
             dismiss()
         }
 
-        Picasso.get().load(file).placeholder(R.drawable.image_placeholder).into(imageView)
-
-       /* Glide.with(MyApplication.instance).load(imageUrl).placeholder(R.drawable.placeholder_rect)
-            .listener(object : RequestListener<Drawable> {
-                override fun onLoadFailed(
-                    e: GlideException?,
-                    model: Any?,
-                    target: Target<Drawable>?,
-                    isFirstResource: Boolean
-                ): Boolean {
-                    loading.visibility = View.VISIBLE
-                    return false
-                }
-
-                override fun onResourceReady(
-                    resource: Drawable?,
-                    model: Any?,
-                    target: Target<Drawable>?,
-                    dataSource: DataSource?,
-                    isFirstResource: Boolean
-                ): Boolean {
-                    loading.visibility = View.GONE
-                    return false
-                }
+        file?.run {
+            Picasso.get().load(this).placeholder(R.drawable.image_placeholder).into(imageView)
+        }
 
 
-            })
-            .into(imageView)*/
+        imageUrl?.run {
+            Picasso.get().load(this).placeholder(R.drawable.image_placeholder).into(imageView)
+        }
+
+
+        /* Glide.with(MyApplication.instance).load(imageUrl).placeholder(R.drawable.placeholder_rect)
+             .listener(object : RequestListener<Drawable> {
+                 override fun onLoadFailed(
+                     e: GlideException?,
+                     model: Any?,
+                     target: Target<Drawable>?,
+                     isFirstResource: Boolean
+                 ): Boolean {
+                     loading.visibility = View.VISIBLE
+                     return false
+                 }
+
+                 override fun onResourceReady(
+                     resource: Drawable?,
+                     model: Any?,
+                     target: Target<Drawable>?,
+                     dataSource: DataSource?,
+                     isFirstResource: Boolean
+                 ): Boolean {
+                     loading.visibility = View.GONE
+                     return false
+                 }
+
+
+             })
+             .into(imageView)*/
         showAtLocation(rootView, Gravity.CENTER, 0, 0)
 
     }
