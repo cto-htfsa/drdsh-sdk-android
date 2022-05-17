@@ -141,8 +141,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         Picasso.get().load(
             Constants.ATTACHMENT_MESSAGE_URL +
                     verifyIdentity?.embeddedChat?.messengerBodyImage
-        )
-            .into(ivDrawable)
+        ).into(ivDrawable)
     }
 
 

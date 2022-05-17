@@ -388,7 +388,7 @@ class UserDetailActivity : LocalizeActivity(), View.OnClickListener {
         when {
             RegExp.chkEmpty(strName) -> {
                 isValid = false
-                AppUtils.showSnackBar(currActivity, tvError, getString(R.string.name_required))
+                AppUtils.showToast(currActivity, getString(R.string.name_required), true)
             }
             /*         RegExp.chkEmpty(strEmail)->{
                          isValid=false
@@ -409,7 +409,7 @@ class UserDetailActivity : LocalizeActivity(), View.OnClickListener {
                      */
             RegExp.chkEmpty(strMsg) -> {
                 isValid = false
-                AppUtils.showSnackBar(currActivity, tvError, getString(R.string.message_required))
+                AppUtils.showToast(currActivity, getString(R.string.message_required), true)
             }
             else -> {
                 tvError.visibility = View.GONE

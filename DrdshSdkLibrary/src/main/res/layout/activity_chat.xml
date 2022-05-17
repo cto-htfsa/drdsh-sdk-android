@@ -45,7 +45,8 @@
                     android:layout_width="30dp"
                     android:layout_height="30dp"
                     android:padding="5dp"
-                    android:src="@drawable/back" />
+
+                    android:src="@drawable/ic_back" />
 
 
                 <TextView
@@ -246,14 +247,14 @@
 
                 <EditText
                     android:id="@+id/etMessage"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_vertical"
                     android:layout_marginStart="5dp"
                     android:layout_weight="1"
                     android:background="@drawable/message_bg"
                     android:fontFamily="@font/gilroy_regular"
-                    android:hint="Type Here"
+                    android:hint="@string/type_your_message"
                     android:maxLines="3"
                     android:minLines="1"
                     android:paddingStart="15dp"

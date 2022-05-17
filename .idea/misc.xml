@@ -3,10 +3,12 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="DrdshSdkLibrary/src/main/res/drawable/dialog_curve_bg.xml" value="0.1" />
+        <entry key="DrdshSdkLibrary/src/main/res/drawable/ic_back.xml" value="0.1" />
         <entry key="DrdshSdkLibrary/src/main/res/drawable/ic_delivered.xml" value="0.1" />
         <entry key="DrdshSdkLibrary/src/main/res/drawable/ic_seen.xml" value="0.1" />
         <entry key="DrdshSdkLibrary/src/main/res/drawable/ic_tick.xml" value="0.1" />
-        <entry key="DrdshSdkLibrary/src/main/res/layout/activity_chat.xml" value="0.18125" />
+        <entry key="DrdshSdkLibrary/src/main/res/layout/activity_chat.xml" value="0.2" />
         <entry key="DrdshSdkLibrary/src/main/res/layout/row_info_msg.xml" value="0.18125" />
         <entry key="DrdshSdkLibrary/src/main/res/layout/row_outgoing_msg.xml" value="0.5" />
       </map>
