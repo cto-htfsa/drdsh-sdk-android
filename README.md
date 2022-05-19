@@ -39,7 +39,7 @@ dependencies {
         
 ```
        
-### here *currentActivity* is context of the activity. and *appSid* is the key of the *drdsh sdk* 
+### Here *currentActivity* is context of the activity and APPSID you will get it from *https://www.drdsh.live/company/api-key.* 
 ### and *domain* is your app base url.
 
 
