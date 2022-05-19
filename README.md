@@ -31,10 +31,10 @@ dependencies {
 ```
  UserDetailActivity.open(
             currActivity = this,
-            appSid = "YOUR_APP_S_ID",
+            appSid = "Your AppSID",
             locale = "en",
             deviceID = deviceId,
-            domain = "YOUR_DOMAIN_NAME"
+            domain = "Your Domain URL"
         )
         
 ```
