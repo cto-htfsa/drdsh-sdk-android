@@ -15,10 +15,17 @@ class MainActivity : AppCompatActivity() {
         val deviceId = Settings.Secure.getString(this.contentResolver, Settings.Secure.ANDROID_ID)
         UserDetailActivity.open(
             currActivity = this,
+            appSid = "612e0581dc220d28580b03be.d9443487762e8844672be133b3aa574cbbd04e58",
+            locale = "en",
+            deviceID = deviceId,
+            domain = "drdsh.live"
+        )
+        /*UserDetailActivity.open(
+            currActivity = this,
             appSid = "YOUR_APP_S_ID",
             locale = "en",
             deviceID = deviceId,
             domain = "YOUR_DOMAIN_NAME"
-        )
+        )*/
     }
 }

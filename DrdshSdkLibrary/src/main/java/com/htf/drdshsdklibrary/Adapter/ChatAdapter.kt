@@ -11,6 +11,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.htf.drdshsdklibrary.Activities.ChatActivity
 import com.htf.drdshsdklibrary.Models.Message
 import com.htf.drdshsdklibrary.PhotoViewer.PhotoFullPopupWindow
@@ -183,9 +184,9 @@ class ChatAdapter(
                 when (model.isAttachment) {
                     Constants.ATTACHMENT_MESSAGE -> {
                         holder.itemView.tvIncomingMsg.visibility = View.GONE
-                        if (model.fileType?.contains(Constants.IMAGE)!!) {
+                        if (model.fileType?.contains(Constants.IMAGE) == true) {
                             holder.itemView.rlIncomingImage.visibility = View.VISIBLE
-                            if (model.attachmentFile?.isFileDownloaded(currActivity)!!) {
+                            if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
                                 holder.itemView.rlIncomingImageTransparent.visibility = View.GONE
                                 model.tempFile = getTempFile(currActivity, model.attachmentFile!!)
                                 Picasso.get().load(model.tempFile!!)
@@ -196,6 +197,32 @@ class ChatAdapter(
                                     .placeholder(R.drawable.image_placeholder)
                                     .into(holder.itemView.ivIncomingImage)
                             }
+                        }
+                        else if (model.fileType?.contains(Constants.VIDEO) == true){
+                            with(holder.itemView){
+                                holder.itemView.rlIncomingImage.visibility = View.VISIBLE
+                                if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
+                                    rlIncomingImageTransparent.visibility = View.GONE
+                                    model.tempFile = getTempFile(currActivity,
+                                        model.attachmentFile!!)
+                                    Glide.with(currActivity).asBitmap()
+                                        .load(model.tempFile)
+                                        .placeholder(R.drawable.ic_video_no_bg)
+                                        .centerCrop()
+                                        .override(256,256)
+                                        .into(ivIncomingImage)
+                                } else {
+                                    holder.itemView.rlIncomingImageTransparent.visibility = View.VISIBLE
+                                    Glide.with(currActivity).asBitmap()
+                                        .load(ATTACHMENT_URL + model.attachmentFile)
+                                        .placeholder(R.drawable.ic_video_no_bg)
+                                        .centerCrop()
+                                        .override(256,256)
+                                        .into(ivIncomingImage)
+                                }
+                            }
+
+
                         }
                     }
 

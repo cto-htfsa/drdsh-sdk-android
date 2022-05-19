@@ -46,5 +46,6 @@ object Constants {
 
 
     const val IMAGE="image"
+    const val VIDEO="video"
 
 }

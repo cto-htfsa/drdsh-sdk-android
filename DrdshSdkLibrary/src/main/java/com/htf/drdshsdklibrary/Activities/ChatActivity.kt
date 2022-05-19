@@ -882,7 +882,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                 if (data != null) {
                     Log.e("agentSendNewMessage", data)
                     val type = object : TypeToken<Message>() {}.type
-                    message = Gson().fromJson<Message>(data, type)
+                    message = Gson().fromJson(data, type)
                     unReadChatMsgId = message.id!!
                     if (!arrMessage.filter { it.id == message.id }.isNotEmpty()) {
                         arrMessage.add(message)
