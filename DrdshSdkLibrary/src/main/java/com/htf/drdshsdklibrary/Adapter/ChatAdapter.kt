@@ -19,14 +19,13 @@ import com.htf.drdshsdklibrary.R
 import com.htf.drdshsdklibrary.Utills.AppUtils
 import com.htf.drdshsdklibrary.Utills.Constants
 import com.htf.drdshsdklibrary.Utills.Constants.ATTACHMENT_URL
-
 import com.htf.learnchinese.utils.AppPreferences
 import com.squareup.picasso.Picasso
 import kotlinx.android.synthetic.main.row_incoming_msg.view.*
 import kotlinx.android.synthetic.main.row_info_msg.view.*
 import kotlinx.android.synthetic.main.row_outgoing_msg.view.*
 import java.io.File
-import kotlin.collections.ArrayList
+
 
 class ChatAdapter(
     private val currActivity: Activity,
@@ -186,6 +185,7 @@ class ChatAdapter(
                         holder.itemView.tvIncomingMsg.visibility = View.GONE
                         if (model.fileType?.contains(Constants.IMAGE) == true) {
                             holder.itemView.rlIncomingImage.visibility = View.VISIBLE
+                            holder.itemView.ivBtnPlay.visibility = View.GONE
                             if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
                                 holder.itemView.rlIncomingImageTransparent.visibility = View.GONE
                                 model.tempFile = getTempFile(currActivity, model.attachmentFile!!)
@@ -197,33 +197,52 @@ class ChatAdapter(
                                     .placeholder(R.drawable.image_placeholder)
                                     .into(holder.itemView.ivIncomingImage)
                             }
-                        }
-                        else if (model.fileType?.contains(Constants.VIDEO) == true){
-                            with(holder.itemView){
+                        } else if (model.fileType?.contains(Constants.VIDEO) == true) {
+                            with(holder.itemView) {
                                 holder.itemView.rlIncomingImage.visibility = View.VISIBLE
                                 if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
+                                    ivBtnPlay.visibility = View.VISIBLE
                                     rlIncomingImageTransparent.visibility = View.GONE
-                                    model.tempFile = getTempFile(currActivity,
-                                        model.attachmentFile!!)
+                                    model.tempFile = getTempFile(
+                                        currActivity,
+                                        model.attachmentFile!!
+                                    )
                                     Glide.with(currActivity).asBitmap()
                                         .load(model.tempFile)
                                         .placeholder(R.drawable.ic_video_no_bg)
                                         .centerCrop()
-                                        .override(256,256)
+                                        .override(256, 256)
                                         .into(ivIncomingImage)
                                 } else {
-                                    holder.itemView.rlIncomingImageTransparent.visibility = View.VISIBLE
+                                    rlIncomingImageTransparent.visibility = View.VISIBLE
                                     Glide.with(currActivity).asBitmap()
                                         .load(ATTACHMENT_URL + model.attachmentFile)
                                         .placeholder(R.drawable.ic_video_no_bg)
                                         .centerCrop()
-                                        .override(256,256)
+                                        .override(256, 256)
                                         .into(ivIncomingImage)
                                 }
                             }
-
-
+                        } else {
+                            with(holder.itemView) {
+                                holder.itemView.rlIncomingImage.visibility = View.VISIBLE
+                                holder.itemView.ivBtnPlay.visibility = View.GONE
+                                holder.itemView.tvIncomingMsg.visibility = View.VISIBLE
+                                holder.itemView.tvIncomingMsg.text = model.message
+                                if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
+                                     rlIncomingImageTransparent.visibility = View.GONE
+                                    model.tempFile = getTempFile(
+                                        currActivity,
+                                        model.attachmentFile!!
+                                    )
+                                    ivIncomingImage.setImageResource(R.drawable.ic_google_docs)
+                                } else {
+                                    rlIncomingImageTransparent.visibility = View.VISIBLE
+                                    ivIncomingImage.setImageResource(R.drawable.ic_google_docs)
+                                }
+                            }
                         }
+
                     }
 
                     Constants.NORMAL_MESSAGE -> {
@@ -234,8 +253,17 @@ class ChatAdapter(
                 }
 
                 holder.itemView.ivIncomingImage.setOnClickListener {
-                    if (model.attachmentFile?.isFileDownloaded(currActivity)!!) {
-                        PhotoFullPopupWindow(holder.itemView, model.tempFile!!, currActivity)
+                    if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
+                        if (model.fileType?.contains(Constants.IMAGE) == true) {
+                            PhotoFullPopupWindow(holder.itemView, model.tempFile!!, currActivity)
+                        } else {
+                            try {
+                                if (currActivity is ChatActivity)
+                                    model.tempFile?.let { it1 -> currActivity.openFile(it1) }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
                     }
                 }
 
@@ -246,6 +274,7 @@ class ChatAdapter(
                             model.attachmentFile!!, holder
                         )
                     } catch (ex: Exception) {
+                        ex.printStackTrace()
 
                     }
                 }
@@ -288,10 +317,7 @@ class ChatAdapter(
 
     private fun String.isFileDownloaded(context: Context): Boolean {
 
-        val tempFile = File(
-            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-            this
-        )
+        val tempFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), this)
         Log.e("File_path", "File Path:$tempFile")
         return tempFile.exists()
     }
@@ -304,6 +330,23 @@ class ChatAdapter(
         Log.e("FILE PATH", "File Path:$tempFile")
         return tempFile
     }
+/*
+    fun open_file(filename: String?) {
+        val path: File = File(getFilesDir(), "dl")
+        val file = File(path, filename)
+
+        // Get URI and MIME type of file
+        val uri: Uri =
+            FileProvider.getUriForFile(this, App.PACKAGE_NAME.toString() + ".fileprovider", file)
+        val mime: String = getContentResolver().getType(uri)
+
+        // Open file with user selected app
+        val intent = Intent()
+        intent.setAction(Intent.ACTION_VIEW)
+        intent.setDataAndType(uri, mime)
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(intent)
+    }*/
 
 
 }

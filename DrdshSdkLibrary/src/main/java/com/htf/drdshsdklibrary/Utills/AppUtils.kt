@@ -579,6 +579,12 @@ object AppUtils {
     }
 
 
+    fun getMimeTypeFromExtension(url: String): String {
+        val ext = MimeTypeMap.getFileExtensionFromUrl(url)
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "text/plain"
+    }
+
+
     fun getFileSize(scheme: String, uri: Uri?, currActivity: Activity):Long{
         var dataSize=0
         var size:Long=0
@@ -700,26 +706,23 @@ object AppUtils {
 
     fun documentPickerIntent(currActivity: Activity, requestCode: Int) {
         // File Types Allowed on Server ::  jpeg/png/jpg/pdf/doc/docx
-
+/*
         val mimeTypes = arrayOf(
-            /*"application/msword",
+            *//*"application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  // .doc & .docx
-            "application/pdf",*/
+            "application/pdf",*//*
             "image/jpeg",
             "image/png",
             "image/jpg",
-        )
+        )*/
 
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-
             type = "*/*"
-
-
+            putExtra(Intent.EXTRA_LOCAL_ONLY, true)
         }
-
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
-        intent.putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+        /*intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+        intent.*/
         currActivity.startActivityForResult(intent, requestCode)
     }
 

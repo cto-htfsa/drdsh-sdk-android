@@ -1,114 +1,118 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:padding="10dp">
 
 
     <com.github.siyamed.shapeimageview.CircularImageView
-        android:layout_width="50dp"
         android:id="@+id/ivAgent"
-        android:visibility="gone"
+        android:layout_width="50dp"
         android:layout_height="50dp"
-        android:src="@drawable/user"/>
-
+        android:src="@drawable/user"
+        android:visibility="gone" />
 
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="40dp"
-        android:layout_marginTop="10dp"
         android:layout_marginStart="10dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="40dp"
         android:orientation="vertical">
 
         <TextView
+            android:id="@+id/tvAgentName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Agent Name"
-            android:textColor="@color/colorDark"
             android:fontFamily="@font/gilroy_regular"
+            android:textColor="@color/colorDark"
             android:textSize="11sp"
-            android:id="@+id/tvAgentName"/>
-        
+            tools:text="Agent Name" />
+
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
             android:layout_marginTop="5dp"
-            android:background="@drawable/bg_incoming_msg">
-            
+            android:background="@drawable/bg_incoming_msg"
+            android:orientation="vertical">
+
             <TextView
+                android:id="@+id/tvIncomingMsg"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="this is the test message...."
                 android:fontFamily="@font/gilroy_regular"
                 android:textColor="@color/colorWhite"
                 android:textSize="12sp"
-                android:id="@+id/tvIncomingMsg"
-                />
+                tools:text="this is the test message...." />
 
             <RelativeLayout
+                android:id="@+id/rlIncomingImage"
                 android:layout_width="150dp"
                 android:layout_height="150dp"
                 android:layout_marginTop="5dp"
                 android:visibility="gone"
-                tools:visibility="visible"
-                android:id="@+id/rlIncomingImage"
-                >
+                tools:visibility="visible">
+
                 <com.github.siyamed.shapeimageview.RoundedImageView
+                    android:id="@+id/ivIncomingImage"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    app:siRadius="8dp"
-                    android:id="@+id/ivIncomingImage"
-                    />
+                    app:siRadius="8dp" />
 
                 <RelativeLayout
+                    android:id="@+id/rlIncomingImageTransparent"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:id="@+id/rlIncomingImageTransparent"
                     android:background="@drawable/bg_transparent_msg_image">
 
                     <net.bohush.geometricprogressview.GeometricProgressView
+                        android:id="@+id/pbIncomingImage"
                         android:layout_width="30dp"
                         android:layout_height="30dp"
-                        app:gp_number_of_angles="20"
-                        android:id="@+id/pbIncomingImage"
-                        android:visibility="gone"
                         android:layout_centerInParent="true"
-                        app:gp_color="@color/colorGrey"/>
+                        android:visibility="gone"
+                        app:gp_color="@color/colorGrey"
+                        app:gp_number_of_angles="20" />
 
                     <ImageView
                         android:id="@+id/ivIncomingImageDownload"
                         android:layout_width="30dp"
                         android:layout_height="30dp"
                         android:layout_centerInParent="true"
-                        android:src="@drawable/ic_download"/>
+                        android:src="@drawable/ic_download" />
+
 
                 </RelativeLayout>
+
+                <ImageView
+                    android:id="@+id/ivBtnPlay"
+                    android:layout_width="70dp"
+                    android:layout_height="70dp"
+                    android:layout_centerInParent="true"
+                    android:src="@drawable/ic_video_no_bg"
+                    android:visibility="gone" />
 
             </RelativeLayout>
 
 
-            
             <TextView
+                android:id="@+id/tvIncomingMsgTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="26 minute ago"
-                android:textSize="12sp"
-                android:id="@+id/tvIncomingMsgTime"
-                android:textColor="@color/colorTextTime"
+                android:layout_marginTop="3dp"
                 android:fontFamily="@font/gilroy_regular"
-                android:layout_marginTop="3dp"/>
-            
+                android:textColor="@color/colorTextTime"
+                android:textSize="12sp"
+                tools:text="26 minute ago" />
+
         </LinearLayout>
 
 
     </LinearLayout>
-
 
 
 </LinearLayout>

@@ -43,7 +43,7 @@
     <string name="gallery">Gallery</string>
     <string name="please_choose_image">Please Choose Image</string>
     <string name="type_your_message">Type your message</string>
-
+    <string name="failed">Failed</string>
 
 
 </resources>

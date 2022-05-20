@@ -5,16 +5,17 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DownloadManager
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
-import android.os.*
+import android.os.Build
+import android.os.Bundle
+import android.os.CountDownTimer
+import android.os.Environment
+import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Base64
@@ -38,12 +39,15 @@ import com.github.nkzawa.socketio.client.Socket
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.htf.drdshsdklibrary.Adapter.ChatAdapter
+import com.htf.drdshsdklibrary.BuildConfig
 import com.htf.drdshsdklibrary.Models.*
-import com.htf.drdshsdklibrary.Models.Message
 import com.htf.drdshsdklibrary.R
-import com.htf.drdshsdklibrary.Utills.*
+import com.htf.drdshsdklibrary.Utills.AppUtils
 import com.htf.drdshsdklibrary.Utills.AppUtils.getFileSize
 import com.htf.drdshsdklibrary.Utills.AppUtils.getMimeType
+import com.htf.drdshsdklibrary.Utills.AppUtils.getMimeTypeFromExtension
+import com.htf.drdshsdklibrary.Utills.AppUtils.showToast
+import com.htf.drdshsdklibrary.Utills.Constants
 import com.htf.drdshsdklibrary.Utills.Constants.ACTION_AGENT_ACCEPT_CHAT_REQUEST
 import com.htf.drdshsdklibrary.Utills.Constants.AGENT_IS_TYPING
 import com.htf.drdshsdklibrary.Utills.Constants.AGENT_TYPING_START
@@ -51,11 +55,11 @@ import com.htf.drdshsdklibrary.Utills.Constants.TYPE_DISLIKE
 import com.htf.drdshsdklibrary.Utills.Constants.TYPE_LIKE
 import com.htf.drdshsdklibrary.Utills.FileCompression.IImageCompressTaskListener
 import com.htf.drdshsdklibrary.Utills.FileCompression.ImageCompressTask
+import com.htf.drdshsdklibrary.Utills.LocalizeActivity
 import com.htf.learnchinese.utils.AppPreferences
 import com.htf.learnchinese.utils.AppSession
 import com.htf.learnchinese.utils.AppSession.Companion.mSocket
 import com.squareup.picasso.Picasso
-import droidninja.filepicker.BuildConfig
 import kotlinx.android.synthetic.main.activity_chat.*
 import kotlinx.android.synthetic.main.dialog_close_chat.view.*
 import kotlinx.android.synthetic.main.dialog_email.view.*
@@ -64,9 +68,8 @@ import kotlinx.android.synthetic.main.dialog_rate.view.*
 import kotlinx.android.synthetic.main.row_incoming_msg.view.*
 import org.json.JSONException
 import org.json.JSONObject
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.io.*
+import java.net.URLEncoder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -192,9 +195,6 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         currActivity,
                         _REQUEST_CODE_DOCUMENT
                     )
-                    /*                   FilePickerBuilder.instance.setMaxCount(1)
-                                     .setActivityTitle(getString(R.string.select_photo))
-                                     .pickPhoto(this, REQUEST_CODE_PHOTO)*/
                 }
             }
         }
@@ -1018,7 +1018,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             try {
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
-                     Log.e("delivered_response",data)
+                    Log.e("delivered_response", data)
 
                     val jsonObject = JSONObject(data)
                     val chatId = jsonObject.optString("_id")
@@ -1045,7 +1045,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             try {
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
-                        Log.e("response readListener",data)
+                    Log.e("response readListener", data)
                     val jsonObject = JSONObject(data)
                     val chatId = jsonObject.optString("_id")
                     val chatReadAt = jsonObject.optString("readAt")
@@ -1064,7 +1064,6 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         }
 
     }
-
 
 
     private fun visitorEndChatSession(
@@ -1293,10 +1292,8 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                id: (Company ID),
                agent_id: (AGENT ID),
                ts: (When start typing then 1 and continue typing 2, and when stop typing then pass 0),
-               message: `virendra start typing...` when continues typing `virendra is typing...`,
+               message: `X start typing...` when continues typing `X is typing...`,
                stop: when stop typing then true else false
-               "appSid": "5def86cf64be6d13f55f2034.5d96941bb5507599887b9c71829d5cffcdf55014",
-               "device" : "android/ios/web/windows/linux"
                */
 
             userJson.put("vid", verifyIdentity.visitorID)
@@ -1483,12 +1480,6 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         )
         Log.e("FILE PATH", "File Path:$tempFile")
         if (tempFile.exists()) {
-            val uri = FileProvider.getUriForFile(
-                context,
-                BuildConfig.APPLICATION_ID + ".provider",
-                tempFile
-
-            )
             return
         }
 
@@ -1568,14 +1559,15 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         object :
             IImageCompressTaskListener {
             override fun onComplete(compressed: List<File>) {
-                //photo compressed. Yay!
-
-                //prepare for uploads. Use an Http library like Retrofit, Volley or async-http-client (My favourite)
-                val file = compressed[0]
-                Log.d("ImageCompressor", "New photo size ==> " + file.length()) //log new file size.
-                uploadFile(file)
-
-
+                //Photo Compressed SuccessFully
+                val fileCompressed = compressed.firstOrNull()
+                fileCompressed?.run {
+                    Log.d(
+                        "ImageCompressor",
+                        "New photo size ==> " + this.length()
+                    ) //log new file size.
+                    uploadFile(this)
+                }
             }
 
             override fun onError(error: Throwable) {
@@ -1590,24 +1582,6 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         super.onActivityResult(requestCode, resultCode, data)
 
         when (requestCode) {
-            /*     REQUEST_CODE_PHOTO -> {
-                     if (data != null && resultCode == Activity.RESULT_OK) {
-                         try {
-                             val dataList =
-                                 data.getStringArrayListExtra(FilePickerConst.KEY_SELECTED_MEDIA)!!
-                             val file = File(dataList[0])
-                             val uri = Uri.fromFile(file)
-
-                             val path = AppUtils.getRealPath(currActivity, uri)
-
-                         } catch (e: Exception) {
-                             e.printStackTrace()
-
-                         }
-
-                     }
-                 }*/
-
             _REQUEST_CODE_DOCUMENT -> {
                 if (data != null && Activity.RESULT_OK == resultCode) {
                     _UPLOAD_REQUEST_CODE = requestCode
@@ -1617,15 +1591,12 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                             AppUtils.getRealPath(currActivity, this)
                         realPath?.let {
                             file = File(it)
-                            file?.let { fileIt ->
-                                //Create ImageCompressTask and execute with Executor.
-                                imageCompressTask =
-                                    ImageCompressTask(
-                                        currActivity,
-                                        it,
-                                        iImageCompressTaskListener
-                                    )
-                                mExecutorService.execute(imageCompressTask)
+                            file?.let { safeFile ->
+                                if (getMimeType(safeFile)?.contains(Constants.IMAGE) == true) {
+                                    imageCompressTask = ImageCompressTask(currActivity, it, iImageCompressTaskListener)
+                                    mExecutorService.execute(imageCompressTask)
+                                } else
+                                    uploadFile(safeFile)
                             }
                         }
                     }
@@ -1683,5 +1654,29 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             })
         }
     }
+
+
+    fun openFile(selectedItem: File) {
+        // Get URI and MIME type of file
+        val uri = FileProvider.getUriForFile(
+            currActivity.applicationContext,
+            "${BuildConfig.LIBRARY_PACKAGE_NAME}.fileProvider",
+            selectedItem
+        )
+        val mime: String = getMimeTypeFromExtension(uri.toString())
+
+        // Open file with user selected app
+        try {
+            val intent = Intent(Intent.ACTION_VIEW)
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.setDataAndType(uri, mime)
+            currActivity.startActivity(intent)
+        } catch (e: Exception) {
+            showToast(currActivity, getString(R.string.failed), true)
+            e.printStackTrace()
+        }
+
+    }
+
 
 }

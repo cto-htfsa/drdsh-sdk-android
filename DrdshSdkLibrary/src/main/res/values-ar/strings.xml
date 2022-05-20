@@ -43,7 +43,7 @@
     <string name="gallery">المعرض</string>
     <string name="please_choose_image">يُرجى اختيار صورة</string>
     <string name="type_your_message">ادخل الرسالة</string>
-
+    <string name="failed">فشل</string>
 
 
 </resources>
