@@ -15,7 +15,7 @@
         <entry key="DrdshSdkLibrary/src/main/res/layout/popup_photo_full.xml" value="0.18125" />
         <entry key="DrdshSdkLibrary/src/main/res/layout/row_incoming_msg.xml" value="0.33" />
         <entry key="DrdshSdkLibrary/src/main/res/layout/row_info_msg.xml" value="0.18125" />
-        <entry key="DrdshSdkLibrary/src/main/res/layout/row_outgoing_msg.xml" value="0.14" />
+        <entry key="DrdshSdkLibrary/src/main/res/layout/row_outgoing_msg.xml" value="0.375" />
       </map>
     </option>
   </component>

@@ -692,7 +692,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             message2.isSystem = true
             message2.messageInfoTypeShowLoading = true
             arrMessage.add(message2)
-            mAdapter.notifyDataSetChanged()
+            mAdapter.notifyItemInserted(arrMessage.size-1)
             recycler.smoothScrollToPosition(arrMessage.size - 1)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -857,7 +857,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             for (m in msg) {
                 val position = arrMessage.indexOf(m)
                 arrMessage.removeAt(position)
-                mAdapter.notifyDataSetChanged()
+                mAdapter.notifyItemRemoved(position)
             }
         }
 
@@ -867,7 +867,8 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             for (m in msg1) {
                 val position = arrMessage.indexOf(m)
                 arrMessage.removeAt(position)
-                mAdapter.notifyDataSetChanged()
+                mAdapter.notifyItemRemoved(position)
+
             }
         }
         visitorLoadChatHistory()
@@ -886,7 +887,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                     unReadChatMsgId = message.id!!
                     if (!arrMessage.filter { it.id == message.id }.isNotEmpty()) {
                         arrMessage.add(message)
-                        mAdapter.notifyDataSetChanged()
+                        mAdapter.notifyItemInserted(arrMessage.size-1)
                         recycler.scrollToPosition(arrMessage.size - 1)
                         llTyping.visibility = View.GONE
 
@@ -948,7 +949,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         message.isSystem = true
                     }
                     arrMessage.add(message)
-                    mAdapter.notifyDataSetChanged()
+                    mAdapter.notifyItemInserted(arrMessage.size-1)
                     recycler.smoothScrollToPosition(arrMessage.size - 1)
                     llBottomWaiting.visibility = View.VISIBLE
                     btnDropMsg.visibility = View.VISIBLE
@@ -1101,7 +1102,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                                 message.isSystem = true
                             }
                             arrMessage.add(message)
-                            mAdapter.notifyDataSetChanged()
+                            mAdapter.notifyItemInserted(arrMessage.size-1)
                             recycler.smoothScrollToPosition(arrMessage.size - 1)
                             llBottomWaiting.visibility = View.VISIBLE
                             btnDropMsg.visibility = View.VISIBLE
@@ -1139,7 +1140,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                             arrMessage.clear()
                             arrMessage.addAll(Gson().fromJson<ArrayList<Message>>(data, type))
                             arrMessage.filter { it.agentId != null }
-                            mAdapter.notifyDataSetChanged()
+                            mAdapter.notifyItemInserted(arrMessage.size-1)
                             recycler.scrollToPosition(arrMessage.size - 1)
                             getData()
                         }
@@ -1368,7 +1369,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             //for show message locally
             addLocal(message, randomId, isAttachment, file, fileType, fileSize)
 
-            mSocket!!.emit("sendVisitorMessage", userJson, Ack { args ->
+            mSocket?.emit("sendVisitorMessage", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
@@ -1425,7 +1426,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         message.message = msg
         arrRandomId.add(localId)
         arrMessage.add(message)
-        mAdapter.notifyDataSetChanged()
+        mAdapter.notifyItemInserted(arrMessage.size-1)
         recycler.smoothScrollToPosition(arrMessage.size - 1)
         etMessage.setText("")
     }

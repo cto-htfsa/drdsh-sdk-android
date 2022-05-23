@@ -27,7 +27,8 @@ import kotlinx.android.synthetic.main.row_outgoing_msg.view.*
 import java.io.File
 
 
-class ChatAdapter(
+class
+ChatAdapter(
     private val currActivity: Activity,
     private val arrMessage: ArrayList<Message>
 ) :
@@ -112,14 +113,11 @@ class ChatAdapter(
 
 
                 holder.itemView.ivOutgoingMsg.setOnClickListener {
-                    if (model.isLocal) {
-                        PhotoFullPopupWindow(holder.itemView, model.tempFile!!, currActivity)
-                    } else {
-                        ImageFullView(
-                            holder.itemView,
-                            ATTACHMENT_URL + model.attachmentFile!!,
-                            currActivity
-                        )
+                        if (model.fileType?.contains(Constants.IMAGE) == true) {
+                            if (model.isLocal)
+                                PhotoFullPopupWindow(holder.itemView, model.tempFile, currActivity)
+                             else
+                                 ImageFullView(holder.itemView, ATTACHMENT_URL + model.attachmentFile, currActivity)
                     }
                 }
 
@@ -127,21 +125,68 @@ class ChatAdapter(
                     Constants.ATTACHMENT_MESSAGE -> {
                         holder.itemView.tvOutgoingMsg.visibility = View.GONE
                         holder.itemView.ivOutgoingMsg.visibility = View.VISIBLE
-                        if (model.isLocal) {
-                            Picasso.get().load(model.tempFile!!)
-                                .placeholder(R.drawable.image_placeholder)
-                                .into(holder.itemView.ivOutgoingMsg)
-                        } else {
-                            model.tempFile = getTempFile(currActivity, model.message!!)
-                            Picasso.get().load(ATTACHMENT_URL + model.attachmentFile)
-                                .placeholder(R.drawable.image_placeholder)
-                                .into(holder.itemView.ivOutgoingMsg)
+                        if (model.fileType?.contains(Constants.IMAGE) == true) {
+                            holder.itemView.ivBtnPlaySender.visibility = View.GONE
+                            if (model.isLocal) {
+                                Picasso.get().load(model.tempFile!!)
+                                    .placeholder(R.drawable.image_placeholder)
+                                    .into(holder.itemView.ivOutgoingMsg)
+                            } else {
+                                model.tempFile = getTempFile(currActivity, model.message!!)
+                                Picasso.get().load(ATTACHMENT_URL + model.attachmentFile)
+                                    .placeholder(R.drawable.image_placeholder)
+                                    .into(holder.itemView.ivOutgoingMsg)
+                            }
                         }
+                        else if (model.fileType?.contains(Constants.VIDEO) == true) {
+                            with(holder.itemView) {
+                                ivBtnPlaySender.visibility = View.VISIBLE
+                                if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
+                                    model.tempFile = getTempFile(
+                                        currActivity,
+                                        model.attachmentFile!!
+                                    )
+                                    Glide.with(currActivity).asBitmap()
+                                        .load(model.tempFile)
+                                        .placeholder(R.drawable.ic_video_no_bg)
+                                        .centerCrop()
+                                        .override(256, 256)
+                                        .into(ivOutgoingMsg)
+                                } else {
+                                    Glide.with(currActivity).asBitmap()
+                                        .load(ATTACHMENT_URL + model.attachmentFile)
+                                        .placeholder(R.drawable.ic_video_no_bg)
+                                        .centerCrop()
+                                        .override(256, 256)
+                                        .into(ivOutgoingMsg)
+                                }
+                            }
+                        }
+                        else {
+                            with(holder.itemView) {
+                                holder.itemView.ivBtnPlaySender.visibility = View.GONE
+                                holder.itemView.tvOutgoingMsg.visibility = View.VISIBLE
+                                holder.itemView.tvOutgoingMsg.text = model.message
+                                if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
+                                    model.tempFile = getTempFile(
+                                        currActivity,
+                                        model.attachmentFile!!
+                                    )
+                                    ivOutgoingMsg.setImageResource(R.drawable.ic_google_docs)
+                                } else {
+                                    ivOutgoingMsg.setImageResource(R.drawable.ic_google_docs)
+                                }
+                            }
+                        }
+
                     }
                     Constants.NORMAL_MESSAGE -> {
-                        holder.itemView.tvOutgoingMsg.visibility = View.VISIBLE
-                        holder.itemView.ivOutgoingMsg.visibility = View.GONE
-                        holder.itemView.tvOutgoingMsg.text = model.message
+                        with(holder.itemView){
+                            tvOutgoingMsg.visibility = View.VISIBLE
+                            ivOutgoingMsg.visibility = View.GONE
+                            tvOutgoingMsg.text = model.message
+                            ivBtnPlaySender.visibility = View.GONE
+                        }
                     }
                 }
 
