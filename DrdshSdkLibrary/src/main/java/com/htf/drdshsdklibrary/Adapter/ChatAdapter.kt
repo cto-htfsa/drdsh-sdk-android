@@ -113,11 +113,39 @@ ChatAdapter(
 
 
                 holder.itemView.ivOutgoingMsg.setOnClickListener {
-                        if (model.fileType?.contains(Constants.IMAGE) == true) {
-                            if (model.isLocal)
-                                PhotoFullPopupWindow(holder.itemView, model.tempFile, currActivity)
-                             else
-                                 ImageFullView(holder.itemView, ATTACHMENT_URL + model.attachmentFile, currActivity)
+                    if (model.fileType?.contains(Constants.IMAGE) == true) {
+                        if (model.isLocal)
+                            PhotoFullPopupWindow(holder.itemView, model.tempFile, currActivity)
+                        else
+                            ImageFullView(
+                                holder.itemView,
+                                ATTACHMENT_URL + model.attachmentFile,
+                                currActivity
+                            )
+                    } else {
+                        if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
+                            try {
+                                if (currActivity is ChatActivity)
+                                    model.tempFile?.let { it1 -> currActivity.openFile(it1) }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        } else {
+                            try {
+                                if (model.attachmentFile != null) {
+                                    (currActivity as ChatActivity).downloadImageFile(
+                                        currActivity,
+                                        ATTACHMENT_URL + model.attachmentFile,
+                                        model.attachmentFile ?: "",
+                                        holder
+                                    )
+                                }
+                            } catch (ex: Exception) {
+                                ex.printStackTrace()
+
+                            }
+                        }
+
                     }
                 }
 
@@ -132,13 +160,12 @@ ChatAdapter(
                                     .placeholder(R.drawable.image_placeholder)
                                     .into(holder.itemView.ivOutgoingMsg)
                             } else {
-                                model.tempFile = getTempFile(currActivity, model.message!!)
+                                model.tempFile = getTempFile(currActivity, model.message?:"")
                                 Picasso.get().load(ATTACHMENT_URL + model.attachmentFile)
                                     .placeholder(R.drawable.image_placeholder)
                                     .into(holder.itemView.ivOutgoingMsg)
                             }
-                        }
-                        else if (model.fileType?.contains(Constants.VIDEO) == true) {
+                        } else if (model.fileType?.contains(Constants.VIDEO) == true) {
                             with(holder.itemView) {
                                 ivBtnPlaySender.visibility = View.VISIBLE
                                 if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
@@ -148,21 +175,18 @@ ChatAdapter(
                                     )
                                     Glide.with(currActivity).asBitmap()
                                         .load(model.tempFile)
-                                        .placeholder(R.drawable.ic_video_no_bg)
                                         .centerCrop()
                                         .override(256, 256)
                                         .into(ivOutgoingMsg)
                                 } else {
                                     Glide.with(currActivity).asBitmap()
                                         .load(ATTACHMENT_URL + model.attachmentFile)
-                                        .placeholder(R.drawable.ic_video_no_bg)
                                         .centerCrop()
                                         .override(256, 256)
                                         .into(ivOutgoingMsg)
                                 }
                             }
-                        }
-                        else {
+                        } else {
                             with(holder.itemView) {
                                 holder.itemView.ivBtnPlaySender.visibility = View.GONE
                                 holder.itemView.tvOutgoingMsg.visibility = View.VISIBLE
@@ -181,7 +205,7 @@ ChatAdapter(
 
                     }
                     Constants.NORMAL_MESSAGE -> {
-                        with(holder.itemView){
+                        with(holder.itemView) {
                             tvOutgoingMsg.visibility = View.VISIBLE
                             ivOutgoingMsg.visibility = View.GONE
                             tvOutgoingMsg.text = model.message
@@ -254,7 +278,6 @@ ChatAdapter(
                                     )
                                     Glide.with(currActivity).asBitmap()
                                         .load(model.tempFile)
-                                        .placeholder(R.drawable.ic_video_no_bg)
                                         .centerCrop()
                                         .override(256, 256)
                                         .into(ivIncomingImage)
@@ -262,7 +285,6 @@ ChatAdapter(
                                     rlIncomingImageTransparent.visibility = View.VISIBLE
                                     Glide.with(currActivity).asBitmap()
                                         .load(ATTACHMENT_URL + model.attachmentFile)
-                                        .placeholder(R.drawable.ic_video_no_bg)
                                         .centerCrop()
                                         .override(256, 256)
                                         .into(ivIncomingImage)
@@ -275,7 +297,7 @@ ChatAdapter(
                                 holder.itemView.tvIncomingMsg.visibility = View.VISIBLE
                                 holder.itemView.tvIncomingMsg.text = model.message
                                 if (model.attachmentFile?.isFileDownloaded(currActivity) == true) {
-                                     rlIncomingImageTransparent.visibility = View.GONE
+                                    rlIncomingImageTransparent.visibility = View.GONE
                                     model.tempFile = getTempFile(
                                         currActivity,
                                         model.attachmentFile!!

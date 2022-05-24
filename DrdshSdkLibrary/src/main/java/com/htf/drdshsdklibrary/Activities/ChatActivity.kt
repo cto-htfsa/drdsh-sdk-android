@@ -5,7 +5,10 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DownloadManager
-import android.content.*
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -15,7 +18,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.Environment
-import android.provider.OpenableColumns
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Base64
@@ -66,10 +68,12 @@ import kotlinx.android.synthetic.main.dialog_email.view.*
 import kotlinx.android.synthetic.main.dialog_for_offline_msg.view.*
 import kotlinx.android.synthetic.main.dialog_rate.view.*
 import kotlinx.android.synthetic.main.row_incoming_msg.view.*
+import kotlinx.android.synthetic.main.row_outgoing_msg.view.*
 import org.json.JSONException
 import org.json.JSONObject
-import java.io.*
-import java.net.URLEncoder
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -93,6 +97,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
     private var _REQUEST_CODE_DOCUMENT = 8444
     private var _UPLOAD_REQUEST_CODE = 0
+    private val MAX_VIDEO_SIZE_IN_BYTES = 20000000L
 
     //create a single thread pool to our image compression class.
     private val mExecutorService: ExecutorService = Executors.newFixedThreadPool(1)
@@ -186,7 +191,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             R.id.ivSend -> {
                 val message = etMessage.text.toString().trim()
                 if (message != "") {
-                    sendVisitorMessage(message, Constants.NORMAL_MESSAGE, null, null, null)
+                    sendVisitorMessage(message, Constants.NORMAL_MESSAGE, null, null, null, file)
                 }
             }
             R.id.ivAttachment -> {
@@ -1072,8 +1077,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         feedback: String,
         dialog: AlertDialog
     ) {
-        if (!mSocket!!.connected()) {
-            mSocket!!.connect()
+        mSocket?.run {
+            if (!this.connected())
+                this.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
         val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
@@ -1130,7 +1136,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             userJson.put("mid", joinChatRoom.visitorMessageId)
             userJson.put("appSid", AppSession.appSid)
             userJson.put("device", AppSession.deviceType)
-            mSocket!!.emit("visitorLoadChatHistory", userJson, Ack { args ->
+            mSocket?.emit("visitorLoadChatHistory", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
                 if (data != null) {
                     try {
@@ -1153,8 +1159,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
     }
 
     private fun updateVisitorRating(feedback: String, dialog: AlertDialog) {
-        if (!mSocket!!.connected()) {
-            mSocket!!.connect()
+        mSocket?.run {
+            if (!this.connected())
+                this.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
         val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
@@ -1184,8 +1191,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
     }
 
     private fun emailChatTranscript(emailId: String, dialog: AlertDialog) {
-        if (!mSocket!!.connected()) {
-            mSocket!!.connect()
+        mSocket?.run {
+            if (!this.connected())
+                this.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
         val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
@@ -1223,8 +1231,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         strSubject: String,
         strMsg: String
     ) {
-        if (!mSocket!!.connected()) {
-            mSocket!!.connect()
+        mSocket?.run {
+            if (!this.connected())
+                this.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
         if (verifyIdentity != null) {
@@ -1257,8 +1266,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
 
     private fun visitorJoinAgentRoom() {
-        if (!mSocket!!.connected()) {
-            mSocket!!.connect()
+        mSocket?.run {
+            if (!this.connected())
+                this.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
         val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetailsInString()
@@ -1281,8 +1291,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
     }
 
     private fun visitorTyping(ts: Int, message: String, stop: Boolean) {
-        if (!mSocket!!.connected()) {
-            mSocket!!.connect()
+        mSocket?.run {
+            if (!this.connected())
+                this.connect()
         }
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
         val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
@@ -1328,7 +1339,8 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         isAttachment: Int,
         attachmentFile: String?,
         fileType: String?,
-        fileSize: String?
+        fileSize: String?,
+        attachedFile: File?=null
     ) {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
@@ -1367,7 +1379,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             userJson.put("device", AppSession.deviceType)
 
             //for show message locally
-            addLocal(message, randomId, isAttachment, file, fileType, fileSize)
+            addLocal(message, randomId, isAttachment, attachedFile, fileType)
 
             mSocket?.emit("sendVisitorMessage", userJson, Ack { args ->
                 val data = if (args.isNotEmpty()) args[0]?.toString() else null
@@ -1377,18 +1389,21 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                             Log.d("sendVisitorMessage", data)
                             val type = object : TypeToken<Message>() {}.type
                             val msg = Gson().fromJson<Message>(data, type)
+                            msg.attachmentFile?.let { Log.e("sendVisitorMessage", it) }
+
                             for (id in arrRandomId) {
                                 if (id == msg.localId) {
-                                    arrMessage.filter { it.isLocal }.filter { it.localId == id }
-                                        .forEach {
+                                    arrMessage.filter { it.isLocal }.filter { it.localId == id }.forEach {
                                             it.isLocal = true
                                             it.message = msg.message
-                                            unReadChatMsgId = msg.id!!
+                                        it.attachmentFile = msg.attachmentFile
+                                            unReadChatMsgId = msg.id?:""
                                         }
-                                    mAdapter.notifyDataSetChanged()
                                     arrRandomId.remove(id)
                                 }
                             }
+                            mAdapter.notifyDataSetChanged()
+
 
                             for (i in 0.until(arrMessage.size)) {
                                 if (arrMessage[i].readAt == null) {
@@ -1409,8 +1424,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
     }
 
     private fun addLocal(
-        msg: String, localId: String, attachment: Int, file: File?, fileType: String?,
-        fileSize: String?
+        msg: String, localId: String, attachment: Int, file: File?, fileType: String?
     ) {
         val message = Message()
         message.isLocal = true
@@ -1421,7 +1435,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         message.isAttachment = attachment
         if (attachment == Constants.ATTACHMENT_MESSAGE) {
             message.tempFile = file
-            message.fileType = fileType
+             message.fileType = fileType
         }
         message.message = msg
         arrRandomId.add(localId)
@@ -1527,13 +1541,84 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         dm.enqueue(dmRequest)
     }
 
+
+    fun downloadImageFile(
+        context: Activity,
+        url: String,
+        fileName: String, holder: ChatAdapter.SentViewHolder
+    ) {
+
+        val folderPath = File(Environment.getExternalStorageDirectory(), "Drdsh")
+        if (!folderPath.exists()) {
+            folderPath.mkdir()
+        }
+
+        val mediaPath = File(folderPath, "Media")
+        if (!mediaPath.exists()) {
+            mediaPath.mkdir()
+        }
+
+
+        val tempFile = File(
+            mediaPath.absolutePath,
+            fileName
+        )
+        Log.e("FILE PATH", "File Path:$tempFile")
+        if (tempFile.exists()) {
+            return
+        }
+
+        holder.itemView.ivBtnPlaySender.visibility = View.GONE
+        holder.itemView.pbOutGoingImage.visibility = View.VISIBLE
+
+        val dmRequest = DownloadManager.Request(Uri.parse(url))
+        dmRequest.setTitle(fileName)
+        dmRequest.setDescription(context.getString(R.string.downloading))
+        dmRequest.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+        dmRequest.setDestinationInExternalPublicDir(
+            Environment.DIRECTORY_DOWNLOADS,
+            File.separator + fileName
+        )
+        dmRequest.setDestinationInExternalFilesDir(
+            context,
+            Environment.DIRECTORY_DOWNLOADS,
+            fileName
+        )
+        dmRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE or DownloadManager.Request.NETWORK_WIFI)
+        dmRequest.setAllowedOverMetered(true)
+        dmRequest.setAllowedOverRoaming(true)
+        val dm =
+            context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val onComplete: BroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+
+                context.unregisterReceiver(this)
+                val downloadId =
+                    intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                val c =
+                    dm.query(DownloadManager.Query().setFilterById(downloadId))
+                if (c.moveToFirst()) {
+                    val status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS))
+                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                        holder.itemView.ivBtnPlaySender.visibility = View.VISIBLE
+                        holder.itemView.pbOutGoingImage.visibility = View.GONE
+                        mAdapter.notifyDataSetChanged()
+                    }
+                }
+                c.close()
+            }
+        }
+        context.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
+        dm.enqueue(dmRequest)
+    }
+
     private fun uploadFile(file: File) {
         val bytes = file.readBytes()
         val base64 = Base64.encodeToString(bytes, 0)
         val mime_type = getMimeType(Uri.fromFile(file), currActivity)
         val fileSize = getFileSize(Uri.fromFile(file).scheme!!, Uri.fromFile(file), currActivity)
         val destinationFile =
-            File(currActivity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), file!!.name)
+            File(currActivity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), file.name)
         val source = FileInputStream(file).channel
         val destination = FileOutputStream(destinationFile).channel
         if (destination != null && source != null) {
@@ -1543,15 +1628,16 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         destination?.close()
 
         Log.e("MIME_TYPE", mime_type)
-        Log.e("FILE_SIZE", "${fileSize}")
+        Log.e("FILE_SIZE", "$fileSize")
         Log.e("BASE_64", base64)
-        Log.e("FILE_NAME", file!!.name)
+        Log.e("FILE_NAME", file.name)
         sendVisitorMessage(
-            file!!.name,
+            file.name,
             Constants.ATTACHMENT_MESSAGE,
             base64,
             mime_type,
-            fileSize.toString()
+            fileSize.toString(),
+            file
         )
     }
 
@@ -1593,11 +1679,18 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         realPath?.let {
                             file = File(it)
                             file?.let { safeFile ->
-                                if (getMimeType(safeFile)?.contains(Constants.IMAGE) == true) {
-                                    imageCompressTask = ImageCompressTask(currActivity, it, iImageCompressTaskListener)
-                                    mExecutorService.execute(imageCompressTask)
-                                } else
-                                    uploadFile(safeFile)
+                                println("Length ${safeFile.length()}")
+                                if (safeFile.length() <= MAX_VIDEO_SIZE_IN_BYTES) {
+                                    if (getMimeType(safeFile)?.contains(Constants.IMAGE) == true) {
+                                        imageCompressTask = ImageCompressTask(currActivity, it, iImageCompressTaskListener)
+                                        mExecutorService.execute(imageCompressTask)
+                                    }
+                                    else
+                                        uploadFile(safeFile)
+                                }
+                                else
+                                    showToast(currActivity, getString(R.string.max_file_size),true)
+
                             }
                         }
                     }

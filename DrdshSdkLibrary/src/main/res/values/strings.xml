@@ -44,6 +44,8 @@
     <string name="please_choose_image">Please Choose Image</string>
     <string name="type_your_message">Type your message</string>
     <string name="failed">Failed</string>
+    <string name="max_file_size">Maximum 20 MB file is allowed.</string>
+
 
 
 </resources>
