@@ -175,11 +175,11 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             }
             R.id.btnRestartChat -> {
                 llWaiting.visibility = View.GONE
-                arrMessage.clear()
+//                arrMessage.clear()
                 restartChat()
             }
             R.id.btnDropMsg -> {
-                arrMessage.clear()
+//                arrMessage.clear()
                 invitationMaxWaitTimeExceeded()
             }
 
@@ -543,7 +543,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             when (type) {
                 TYPE_DISLIKE -> {
                     dialogView.ivLikeDislike.setImageResource(R.drawable.dislike)
-                    feedbackStatus = "bed"
+                    feedbackStatus = "bad"
                 }
                 TYPE_LIKE -> {
                     dialogView.ivLikeDislike.setImageResource(R.drawable.like)
@@ -697,8 +697,12 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             message2.isSystem = true
             message2.messageInfoTypeShowLoading = true
             arrMessage.add(message2)
-            mAdapter.notifyItemInserted(arrMessage.size-1)
-            recycler.smoothScrollToPosition(arrMessage.size - 1)
+            if (arrMessage.isNotEmpty()){
+                mAdapter.notifyItemInserted(arrMessage.size-1)
+                recycler.smoothScrollToPosition(arrMessage.size - 1)
+            }
+            else
+                mAdapter.notifyDataSetChanged()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -892,8 +896,13 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                     unReadChatMsgId = message.id!!
                     if (!arrMessage.filter { it.id == message.id }.isNotEmpty()) {
                         arrMessage.add(message)
-                        mAdapter.notifyItemInserted(arrMessage.size-1)
-                        recycler.scrollToPosition(arrMessage.size - 1)
+                        if (arrMessage.isNotEmpty()){
+                            mAdapter.notifyItemInserted(arrMessage.size-1)
+                            recycler.scrollToPosition(arrMessage.size-1)
+                        }
+                        else
+                            mAdapter.notifyDataSetChanged()
+
                         llTyping.visibility = View.GONE
 
                     }
@@ -954,8 +963,12 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         message.isSystem = true
                     }
                     arrMessage.add(message)
-                    mAdapter.notifyItemInserted(arrMessage.size-1)
-                    recycler.smoothScrollToPosition(arrMessage.size - 1)
+                    if (arrMessage.isNotEmpty()){
+                        mAdapter.notifyItemInserted(arrMessage.size-1)
+                        recycler.smoothScrollToPosition(arrMessage.size - 1)
+                    }
+                    mAdapter.notifyDataSetChanged()
+
                     llBottomWaiting.visibility = View.VISIBLE
                     btnDropMsg.visibility = View.VISIBLE
                     openCloseChatDialog(Constants.ALERT_TYPE_CHAT_RATING, currActivity)
@@ -1108,8 +1121,12 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                                 message.isSystem = true
                             }
                             arrMessage.add(message)
-                            mAdapter.notifyItemInserted(arrMessage.size-1)
-                            recycler.smoothScrollToPosition(arrMessage.size - 1)
+                            if (arrMessage.isNotEmpty()){
+                                mAdapter.notifyItemInserted(arrMessage.size-1)
+                                recycler.smoothScrollToPosition(arrMessage.size - 1)
+                            }
+                            else
+                                mAdapter.notifyDataSetChanged()
                             llBottomWaiting.visibility = View.VISIBLE
                             btnDropMsg.visibility = View.VISIBLE
                             dialog.dismiss()
@@ -1146,8 +1163,13 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                             arrMessage.clear()
                             arrMessage.addAll(Gson().fromJson<ArrayList<Message>>(data, type))
                             arrMessage.filter { it.agentId != null }
-                            mAdapter.notifyItemInserted(arrMessage.size-1)
-                            recycler.scrollToPosition(arrMessage.size - 1)
+                            if (arrMessage.isNotEmpty()){
+                                mAdapter.notifyItemInserted(arrMessage.size-1)
+                                recycler.scrollToPosition(arrMessage.size - 1)
+                            }
+                            else
+                                mAdapter.notifyDataSetChanged()
+
                             getData()
                         }
                     } catch (e: JSONException) {
@@ -1440,8 +1462,13 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         message.message = msg
         arrRandomId.add(localId)
         arrMessage.add(message)
-        mAdapter.notifyItemInserted(arrMessage.size-1)
-        recycler.smoothScrollToPosition(arrMessage.size - 1)
+        if (arrMessage.isNotEmpty()){
+            mAdapter.notifyItemInserted(arrMessage.size-1)
+            recycler.smoothScrollToPosition(arrMessage.size - 1)
+        }
+        else
+            mAdapter.notifyDataSetChanged()
+
         etMessage.setText("")
     }
 
