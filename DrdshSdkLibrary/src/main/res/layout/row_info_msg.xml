@@ -32,10 +32,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text=""
-            android:layout_gravity="center"
             android:id="@+id/tvInfoMsg"
+            android:textAlignment="center"
             android:fontFamily="@font/gilroy_regular"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textColor="@color/colorDark"/>
 
 

@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.Dialog
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -38,6 +39,8 @@ import com.github.nkzawa.emitter.Emitter
 import com.github.nkzawa.socketio.client.Ack
 import com.github.nkzawa.socketio.client.IO
 import com.github.nkzawa.socketio.client.Socket
+import com.github.nkzawa.socketio.client.Socket.EVENT_CONNECT
+import com.github.nkzawa.socketio.client.Socket.EVENT_DISCONNECT
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.htf.drdshsdklibrary.Adapter.ChatAdapter
@@ -53,11 +56,10 @@ import com.htf.drdshsdklibrary.Utills.Constants
 import com.htf.drdshsdklibrary.Utills.Constants.ACTION_AGENT_ACCEPT_CHAT_REQUEST
 import com.htf.drdshsdklibrary.Utills.Constants.AGENT_IS_TYPING
 import com.htf.drdshsdklibrary.Utills.Constants.AGENT_TYPING_START
-import com.htf.drdshsdklibrary.Utills.Constants.TYPE_DISLIKE
-import com.htf.drdshsdklibrary.Utills.Constants.TYPE_LIKE
 import com.htf.drdshsdklibrary.Utills.FileCompression.IImageCompressTaskListener
 import com.htf.drdshsdklibrary.Utills.FileCompression.ImageCompressTask
 import com.htf.drdshsdklibrary.Utills.LocalizeActivity
+import com.htf.drdshsdklibrary.Utills.RegExp
 import com.htf.learnchinese.utils.AppPreferences
 import com.htf.learnchinese.utils.AppSession
 import com.htf.learnchinese.utils.AppSession.Companion.mSocket
@@ -66,7 +68,6 @@ import kotlinx.android.synthetic.main.activity_chat.*
 import kotlinx.android.synthetic.main.dialog_close_chat.view.*
 import kotlinx.android.synthetic.main.dialog_email.view.*
 import kotlinx.android.synthetic.main.dialog_for_offline_msg.view.*
-import kotlinx.android.synthetic.main.dialog_rate.view.*
 import kotlinx.android.synthetic.main.row_incoming_msg.view.*
 import kotlinx.android.synthetic.main.row_outgoing_msg.view.*
 import org.json.JSONException
@@ -155,24 +156,10 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
     override fun onClick(v: View?) {
         when (v?.id) {
-            R.id.iv_back -> {
-                finish()
-            }
-            R.id.ivDislike -> {
-                if (!isFinishing) {
-                    openRateDialog(TYPE_DISLIKE)
-                }
-            }
-            R.id.ivLike -> {
-                if (!isFinishing) {
-                    openRateDialog(TYPE_LIKE)
-                }
-            }
-            R.id.ivMail -> {
-                if (!isFinishing) {
-                    openMailDialog(Constants.ALERT_TYPE_SEND_EMAIL, currActivity)
-                }
-            }
+            R.id.iv_back -> finish()
+            R.id.ivDislike -> if (!isFinishing) updateVisitorRating("bad")
+            R.id.ivLike -> if (!isFinishing) updateVisitorRating("good")
+            R.id.ivMail -> if (!isFinishing) openMailDialog()
             R.id.btnRestartChat -> {
                 llWaiting.visibility = View.GONE
 //                arrMessage.clear()
@@ -183,16 +170,14 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                 invitationMaxWaitTimeExceeded()
             }
 
-            R.id.tvCloseChat -> {
-                if (!isFinishing) {
-                    openCloseChatDialog(Constants.ALERT_TYPE_CLOSE_CHAT, currActivity)
-                }
-            }
+            R.id.tvCloseChat -> if (!isFinishing) openCloseChatDialog(
+                Constants.ALERT_TYPE_CLOSE_CHAT,
+                currActivity
+            )
             R.id.ivSend -> {
                 val message = etMessage.text.toString().trim()
-                if (message != "") {
+                if (message.isNotBlank())
                     sendVisitorMessage(message, Constants.NORMAL_MESSAGE, null, null, null, file)
-                }
             }
             R.id.ivAttachment -> {
                 if (checkCameraPermission(currActivity, 100, null)) {
@@ -205,7 +190,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         }
     }
 
-    fun checkCameraPermission(
+    private fun checkCameraPermission(
         activity: Activity,
         permissionCode: Int,
         fragment: Fragment?
@@ -285,29 +270,28 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         try {
             if (mSocket == null) {
                 mSocket = IO.socket("https://www.drdsh.live/")
-                mSocket!!.io().reconnection(false)
+                mSocket?.io()?.reconnection(false)
             }
 
             if (mSocket != null) {
                 if (!mSocket!!.connected()) {
-                    mSocket!!.on(Socket.EVENT_CONNECT, onConnected)
-                    mSocket!!.on("disconnect", onDisconnect)
-                    mSocket!!.connect()
+                    mSocket?.on(EVENT_CONNECT, onConnected)
+                    mSocket?.on(EVENT_DISCONNECT, onDisconnect)
+                    mSocket?.connect()
                 }
             }
 
-            mSocket!!.on("totalOnlineAgents", totalOnlineAgents)
-            mSocket!!.on("agentSendNewMessage", agentSendNewMessage)
-            mSocket!!.on("agentTypingListener", agentTypingListener)
-            mSocket!!.on("agentChatSessionTerminated", agentChatSessionTerminated)
-            mSocket!!.on("agentAcceptedChatRequest", agentAcceptedChatRequest)
-            mSocket!!.on("ipBlocked", agentIpBlockedRequest)
-            mSocket!!.on("isDeliveredListener", isDeliveredListener)
-            mSocket!!.on("isReadListener", isReadListener)
+            mSocket?.on("totalOnlineAgents", totalOnlineAgents)
+            mSocket?.on("agentSendNewMessage", agentSendNewMessage)
+            mSocket?.on("agentTypingListener", agentTypingListener)
+            mSocket?.on("agentChatSessionTerminated", agentChatSessionTerminated)
+            mSocket?.on("agentAcceptedChatRequest", agentAcceptedChatRequest)
+            mSocket?.on("ipBlocked", agentIpBlockedRequest)
+            mSocket?.on("isDeliveredListener", isDeliveredListener)
+            mSocket?.on("isReadListener", isReadListener)
 
 
         } catch (e: Exception) {
-            e.printStackTrace()
             e.printStackTrace()
         }
 
@@ -326,8 +310,8 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                     Log.e("onDisconnect", data)
                     if (mSocket != null) {
                         if (!mSocket!!.connected()) {
-                            mSocket!!.on(Socket.EVENT_CONNECT, onConnected)
-                            mSocket!!.connect()
+                            mSocket?.on(Socket.EVENT_CONNECT, onConnected)
+                            mSocket?.connect()
                         }
                     }
 
@@ -465,7 +449,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
                 when {
                     strName == "" -> {
-                        AppUtils.showToast(
+                        showToast(
                             this.currActivity,
                             getString(R.string.name_required),
                             true
@@ -473,7 +457,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
                     }
                     strEmail == "" -> {
-                        AppUtils.showToast(
+                        showToast(
                             this.currActivity,
                             getString(R.string.email_id_requied),
                             true
@@ -481,7 +465,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
                     }
                     strMobile == "" -> {
-                        AppUtils.showToast(
+                        showToast(
                             this.currActivity,
                             getString(R.string.mobile_required),
                             true
@@ -489,7 +473,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
                     }
                     strSubject == "" -> {
-                        AppUtils.showToast(
+                        showToast(
                             this.currActivity,
                             getString(R.string.subject_required),
                             true
@@ -497,7 +481,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
                     }
                     strMsg == "" -> {
-                        AppUtils.showToast(
+                        showToast(
                             this.currActivity,
                             getString(R.string.message_required),
                             true
@@ -526,7 +510,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
     }
 
 
-    private fun openRateDialog(type: Int) {
+/*    private fun openRateDialog(type: Int) {
         try {
             val builder = AlertDialog.Builder(currActivity)
             val dialogView = currActivity.layoutInflater.inflate(R.layout.dialog_rate, null)
@@ -537,39 +521,35 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             dialogView.tvRate.backgroundTintList =
                 ColorStateList.valueOf(Color.parseColor(verifyIdentity?.embeddedChat?.buttonColor))
 
-            var feedbackStatus = "Good"
             var feedback = ""
-
             when (type) {
                 TYPE_DISLIKE -> {
                     dialogView.ivLikeDislike.setImageResource(R.drawable.dislike)
-                    feedbackStatus = "bad"
+                    feedback = "Bad"
                 }
                 TYPE_LIKE -> {
                     dialogView.ivLikeDislike.setImageResource(R.drawable.like)
-                    feedbackStatus = "Good"
+                    feedback = "Good"
                 }
             }
             dialogView.tvRate.setOnClickListener {
-                feedback = dialogView.etRate.text.toString().trim()
-                updateVisitorRating(feedback, dialog)
             }
 
 
             val window = dialog.window
-            window!!.setLayout(
+            window?.setLayout(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
             )
-            window.setGravity(Gravity.CENTER)
-            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            window?.setGravity(Gravity.CENTER)
+            window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             dialog.show()
 
         } catch (e: Exception) {
-
+            e.printStackTrace()
         }
 
-    }
+    }*/
 
     private fun openCloseChatDialog(type: Int, currActivity: Activity) {
         try {
@@ -594,7 +574,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             dialogView.ivThumbDown.setOnClickListener {
                 dialogView.ivThumbUp.setImageResource(R.drawable.like)
                 dialogView.ivThumbDown.setImageResource(R.drawable.thums_down)
-                feedbackStatus = "bed"
+                feedbackStatus = "Bad"
             }
             dialogView.btnCloseChat.setOnClickListener {
                 feedback = dialogView.etFeedback.text.toString().trim()
@@ -603,7 +583,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         if (feedback != "") {
                             visitorEndChatSession(feedbackStatus, feedback, dialog)
                         } else {
-                            AppUtils.showToast(
+                            showToast(
                                 this.currActivity,
                                 getString(R.string.feedback_requied),
                                 true
@@ -632,7 +612,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
     }
 
-    private fun openMailDialog(type: Int, currActivity: Activity) {
+    private fun openMailDialog() {
         try {
             val builder = AlertDialog.Builder(currActivity)
             val dialogView = currActivity.layoutInflater.inflate(R.layout.dialog_email, null)
@@ -646,19 +626,19 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
             dialogView.tvEmailSend.setOnClickListener {
                 emailId = dialogView.etEmailId.text.toString().trim()
-                when (type) {
-                    Constants.ALERT_TYPE_SEND_EMAIL -> {
-                        if (emailId != "") {
-                            emailChatTranscript(emailId, dialog)
-                        } else {
-                            AppUtils.showToast(
-                                this.currActivity,
-                                getString(R.string.email_id_requied),
-                                true
-                            )
+                if (emailId.isNotEmpty()){
+                    if (RegExp.isValidEmail(emailId)){
+                        if (dialog.isShowing){
+                            dialog.dismiss()
+                            emailChatTranscript(emailId)
                         }
                     }
+                    else
+                        showToast(this.currActivity, getString(R.string.email_invalid), true)
                 }
+                else
+                    showToast(this.currActivity, getString(R.string.please_input_your_email_address), true)
+
             }
 
             dialogView.tvCloseEmail.setOnClickListener {
@@ -674,6 +654,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             dialog.show()
         } catch (e: Exception) {
+            e.printStackTrace()
 
         }
 
@@ -697,11 +678,10 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             message2.isSystem = true
             message2.messageInfoTypeShowLoading = true
             arrMessage.add(message2)
-            if (arrMessage.isNotEmpty()){
-                mAdapter.notifyItemInserted(arrMessage.size-1)
+            if (arrMessage.isNotEmpty()) {
+                mAdapter.notifyItemInserted(arrMessage.size - 1)
                 recycler.smoothScrollToPosition(arrMessage.size - 1)
-            }
-            else
+            } else
                 mAdapter.notifyDataSetChanged()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -801,7 +781,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             userJson.put("appSid", AppSession.appSid)
             userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("invitationMaxWaitTimeExceeded", userJson, Ack { args ->
-                val data = if (args.isNotEmpty()) args[0]?.toString() else null
+                val data = if (args.isNotEmpty()) args.first()?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
@@ -896,11 +876,10 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                     unReadChatMsgId = message.id!!
                     if (!arrMessage.filter { it.id == message.id }.isNotEmpty()) {
                         arrMessage.add(message)
-                        if (arrMessage.isNotEmpty()){
-                            mAdapter.notifyItemInserted(arrMessage.size-1)
-                            recycler.scrollToPosition(arrMessage.size-1)
-                        }
-                        else
+                        if (arrMessage.isNotEmpty()) {
+                            mAdapter.notifyItemInserted(arrMessage.size - 1)
+                            recycler.scrollToPosition(arrMessage.size - 1)
+                        } else
                             mAdapter.notifyDataSetChanged()
 
                         llTyping.visibility = View.GONE
@@ -963,8 +942,8 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         message.isSystem = true
                     }
                     arrMessage.add(message)
-                    if (arrMessage.isNotEmpty()){
-                        mAdapter.notifyItemInserted(arrMessage.size-1)
+                    if (arrMessage.isNotEmpty()) {
+                        mAdapter.notifyItemInserted(arrMessage.size - 1)
                         recycler.smoothScrollToPosition(arrMessage.size - 1)
                     }
                     mAdapter.notifyDataSetChanged()
@@ -1121,11 +1100,10 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                                 message.isSystem = true
                             }
                             arrMessage.add(message)
-                            if (arrMessage.isNotEmpty()){
-                                mAdapter.notifyItemInserted(arrMessage.size-1)
+                            if (arrMessage.isNotEmpty()) {
+                                mAdapter.notifyItemInserted(arrMessage.size - 1)
                                 recycler.smoothScrollToPosition(arrMessage.size - 1)
-                            }
-                            else
+                            } else
                                 mAdapter.notifyDataSetChanged()
                             llBottomWaiting.visibility = View.VISIBLE
                             btnDropMsg.visibility = View.VISIBLE
@@ -1160,14 +1138,13 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         runOnUiThread {
                             Log.d("visitorLoadChatHistory", data)
                             val type = object : TypeToken<ArrayList<Message>>() {}.type
-                            arrMessage.clear()
+//                            arrMessage.clear()
                             arrMessage.addAll(Gson().fromJson<ArrayList<Message>>(data, type))
                             arrMessage.filter { it.agentId != null }
-                            if (arrMessage.isNotEmpty()){
-                                mAdapter.notifyItemInserted(arrMessage.size-1)
+                            if (arrMessage.isNotEmpty()) {
+                                mAdapter.notifyItemInserted(arrMessage.size - 1)
                                 recycler.scrollToPosition(arrMessage.size - 1)
-                            }
-                            else
+                            } else
                                 mAdapter.notifyDataSetChanged()
 
                             getData()
@@ -1180,7 +1157,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         }
     }
 
-    private fun updateVisitorRating(feedback: String, dialog: AlertDialog) {
+    private fun updateVisitorRating(feedback: String, dialog: Dialog? = null) {
         mSocket?.run {
             if (!this.connected())
                 this.connect()
@@ -1189,19 +1166,21 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
         if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
-
             userJson.put("mid", joinChatRoom.visitorMessageId)
             userJson.put("vid", verifyIdentity.visitorID)
             userJson.put("feedback", feedback)
             userJson.put("appSid", AppSession.appSid)
             userJson.put("device", AppSession.deviceType)
-            mSocket!!.emit("updateVisitorRating", userJson, Ack { args ->
-                val data = if (args.isNotEmpty()) args[0]?.toString() else null
+            userJson.put("locale", AppSession.locale)
+            println("Sending Feedback :: $userJson")
+            mSocket?.emit("updateVisitorRating", userJson, Ack { args ->
+                val data = if (args.isNotEmpty()) args.first()?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
                             Log.d("updateVisitorRating", data)
-                            dialog.dismiss()
+                            if (dialog?.isShowing == true)
+                                dialog.dismiss()
                         }
                     } catch (e: JSONException) {
                         e.printStackTrace()
@@ -1212,7 +1191,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
     }
 
-    private fun emailChatTranscript(emailId: String, dialog: AlertDialog) {
+    private fun emailChatTranscript(emailId: String) {
         mSocket?.run {
             if (!this.connected())
                 this.connect()
@@ -1228,12 +1207,11 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             userJson.put("appSid", AppSession.appSid)
             userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("emailChatTranscript", userJson, Ack { args ->
-                val data = if (args.isNotEmpty()) args[0]?.toString() else null
+                val data = if (args.isNotEmpty()) args.first()?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
                             Log.d("updateVisitorRating", data)
-                            dialog.dismiss()
                         }
                     } catch (e: JSONException) {
                         e.printStackTrace()
@@ -1269,7 +1247,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             userJson.put("appSid", AppSession.appSid)
             userJson.put("device", AppSession.deviceType)
             mSocket!!.emit("submitOfflineMessage", userJson, Ack { args ->
-                val data = if (args.isNotEmpty()) args[0]?.toString() else null
+                val data = if (args.isNotEmpty()) args.first()?.toString() else null
                 runOnUiThread {
                     if (data != null) {
                         try {
@@ -1298,8 +1276,8 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             val userJson = JSONObject(joinChatRoom)
             userJson.put("appSid", AppSession.appSid)
             userJson.put("device", AppSession.deviceType)
-            mSocket!!.emit("visitorJoinAgentRoom", userJson, Ack { args ->
-                val data = if (args.isNotEmpty()) args[0]?.toString() else null
+            mSocket?.emit("visitorJoinAgentRoom", userJson, Ack { args ->
+                val data = if (args.isNotEmpty()) args.first()?.toString() else null
                 if (data != null) {
                     try {
                         Log.d("visitorJoinAgentRoom", data)
@@ -1340,7 +1318,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             userJson.put("device", AppSession.deviceType)
 
             mSocket?.emit("visitorTyping", userJson, Ack { args ->
-                val data = if (args.isNotEmpty()) args[0]?.toString() else null
+                val data = if (args.isNotEmpty()) args.first()?.toString() else null
                 currActivity.runOnUiThread {
                     if (data != null) {
                         try {
@@ -1362,7 +1340,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         attachmentFile: String?,
         fileType: String?,
         fileSize: String?,
-        attachedFile: File?=null
+        attachedFile: File? = null
     ) {
         if (!mSocket!!.connected()) {
             mSocket!!.connect()
@@ -1404,7 +1382,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
             addLocal(message, randomId, isAttachment, attachedFile, fileType)
 
             mSocket?.emit("sendVisitorMessage", userJson, Ack { args ->
-                val data = if (args.isNotEmpty()) args[0]?.toString() else null
+                val data = if (args.isNotEmpty()) args.first()?.toString() else null
                 if (data != null) {
                     try {
                         runOnUiThread {
@@ -1415,11 +1393,12 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
                             for (id in arrRandomId) {
                                 if (id == msg.localId) {
-                                    arrMessage.filter { it.isLocal }.filter { it.localId == id }.forEach {
+                                    arrMessage.filter { it.isLocal }.filter { it.localId == id }
+                                        .forEach {
                                             it.isLocal = true
                                             it.message = msg.message
-                                        it.attachmentFile = msg.attachmentFile
-                                            unReadChatMsgId = msg.id?:""
+                                            it.attachmentFile = msg.attachmentFile
+                                            unReadChatMsgId = msg.id ?: ""
                                         }
                                     arrRandomId.remove(id)
                                 }
@@ -1457,16 +1436,15 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         message.isAttachment = attachment
         if (attachment == Constants.ATTACHMENT_MESSAGE) {
             message.tempFile = file
-             message.fileType = fileType
+            message.fileType = fileType
         }
         message.message = msg
         arrRandomId.add(localId)
         arrMessage.add(message)
-        if (arrMessage.isNotEmpty()){
-            mAdapter.notifyItemInserted(arrMessage.size-1)
+        if (arrMessage.isNotEmpty()) {
+            mAdapter.notifyItemInserted(arrMessage.size - 1)
             recycler.smoothScrollToPosition(arrMessage.size - 1)
-        }
-        else
+        } else
             mAdapter.notifyDataSetChanged()
 
         etMessage.setText("")
@@ -1709,14 +1687,16 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                                 println("Length ${safeFile.length()}")
                                 if (safeFile.length() <= MAX_VIDEO_SIZE_IN_BYTES) {
                                     if (getMimeType(safeFile)?.contains(Constants.IMAGE) == true) {
-                                        imageCompressTask = ImageCompressTask(currActivity, it, iImageCompressTaskListener)
+                                        imageCompressTask = ImageCompressTask(
+                                            currActivity,
+                                            it,
+                                            iImageCompressTaskListener
+                                        )
                                         mExecutorService.execute(imageCompressTask)
-                                    }
-                                    else
+                                    } else
                                         uploadFile(safeFile)
-                                }
-                                else
-                                    showToast(currActivity, getString(R.string.max_file_size),true)
+                                } else
+                                    showToast(currActivity, getString(R.string.max_file_size), true)
 
                             }
                         }

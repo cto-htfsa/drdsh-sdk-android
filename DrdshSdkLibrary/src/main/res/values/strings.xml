@@ -45,7 +45,8 @@
     <string name="type_your_message">Type your message</string>
     <string name="failed">Failed</string>
     <string name="max_file_size">Maximum 20 MB file is allowed.</string>
-
+    <string name="email_transcription">Email Chat Transcription</string>
+    <string name="chat_transcripts_will_be_sent_to_this_email_address">Chat transcripts will be sent to this email address.</string>
 
 
 </resources>

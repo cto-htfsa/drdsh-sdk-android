@@ -45,7 +45,8 @@
     <string name="type_your_message">ادخل الرسالة</string>
     <string name="failed">فشل</string>
     <string name="max_file_size">يُسمح بالملفات بحجم 20MB فقط.</string>
-
+    <string name="email_transcription">ارسال الدردشة عبر البريد الالكتروني</string>
+    <string name="chat_transcripts_will_be_sent_to_this_email_address">سيتم ارسال الدردشة الى البريد الالكتروني المدخل</string>
 
 
 </resources>
