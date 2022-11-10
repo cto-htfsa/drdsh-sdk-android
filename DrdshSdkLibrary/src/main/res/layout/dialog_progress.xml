@@ -14,17 +14,12 @@
         android:orientation="vertical"
         android:padding="5dp">
 
-        <net.bohush.geometricprogressview.GeometricProgressView
+        <ProgressBar
             android:id="@+id/progressView"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
-            app:gp_color="@color/colorDark"
-            app:gp_duration="500"
-            app:gp_figure_padding="5dp"
-            app:gp_number_of_angles="16"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            style="@style/CircularInDeterminateProgressBar"
             />
-
-
 
 
     </RelativeLayout>

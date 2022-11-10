@@ -126,7 +126,6 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         setEmbeddedChat()
         visitorLoadChatHistory()
 
-
         val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
         if (joinChatRoom != null) {
             if (joinChatRoom.visitorMessageId == null) {
@@ -860,6 +859,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
 
             }
         }
+
         visitorLoadChatHistory()
 
     }
@@ -882,7 +882,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         } else
                             mAdapter.notifyDataSetChanged()
 
-                        llTyping.visibility = View.GONE
+                        llTyping.visibility = View.INVISIBLE
 
                     }
 
@@ -903,8 +903,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                     val type = object : TypeToken<AgentTyping>() {}.type
                     val agentTyping = Gson().fromJson<AgentTyping>(data, type)
                     if (agentTyping.vid == verifyIdentity?.visitorID) {
-                        Picasso.get().load(Constants.AGENT_IMAGE_URL + joinChatRoom?.agentImage)
-                            .placeholder(R.drawable.user).into(ivAgentTyping)
+                        Picasso.get().load(Constants.AGENT_IMAGE_URL + joinChatRoom?.agentImage).placeholder(R.drawable.user).into(ivAgentTyping)
                         tvAgentTyping.text = agentTyping.message
                         when (agentTyping.ts) {
                             AGENT_TYPING_START -> {
@@ -912,7 +911,7 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                             }
                             AGENT_IS_TYPING -> {
                                 if (agentTyping?.stop!!) {
-                                    llTyping.visibility = View.GONE
+                                    llTyping.visibility = View.INVISIBLE
                                 } else {
                                     llTyping.visibility = View.VISIBLE
                                 }
@@ -1000,7 +999,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                 if (data != null) {
                     Log.e("totalOnlineAgents", data)
                 } else {
-                    Log.e("totalOnlineAgents", data)
+                    if (data != null) {
+                        Log.e("totalOnlineAgents", data)
+                    }
                 }
             }
 
@@ -1120,12 +1121,11 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
     }
 
     private fun visitorLoadChatHistory() {
-        /* if (!mSocket!!.connected()) {
-            mSocket!!.connect()
-        }*/
-
         val verifyIdentity = AppPreferences.getInstance(currActivity).getIdentityDetails()
         val joinChatRoom = AppPreferences.getInstance(currActivity).getJoinChatRoomDetails()
+        Picasso.get().load(Constants.AGENT_IMAGE_URL + joinChatRoom?.agentImage).placeholder(R.drawable.user).into(ivAgent)
+
+
         if (verifyIdentity != null && joinChatRoom != null) {
             val userJson = JSONObject()
             userJson.put("mid", joinChatRoom.visitorMessageId)
@@ -1138,8 +1138,8 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                         runOnUiThread {
                             Log.d("visitorLoadChatHistory", data)
                             val type = object : TypeToken<ArrayList<Message>>() {}.type
-//                            arrMessage.clear()
-                            arrMessage.addAll(Gson().fromJson<ArrayList<Message>>(data, type))
+                            val message = Gson().fromJson<ArrayList<Message>>(data, type)
+                            arrMessage.addAll(message)
                             arrMessage.filter { it.agentId != null }
                             if (arrMessage.isNotEmpty()) {
                                 mAdapter.notifyItemInserted(arrMessage.size - 1)
@@ -1533,11 +1533,15 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                 val c =
                     dm.query(DownloadManager.Query().setFilterById(downloadId))
                 if (c.moveToFirst()) {
-                    val status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS))
-                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                        holder.itemView.pbIncomingImage.visibility = View.GONE
-                        mAdapter.notifyDataSetChanged()
+                    val indexAt = c.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                    if (indexAt !=-1){
+                        val status = c.getInt(indexAt)
+                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            holder.itemView.pbIncomingImage.visibility = View.GONE
+                            mAdapter.notifyDataSetChanged()
+                        }
                     }
+
                 }
                 c.close()
             }
@@ -1603,12 +1607,17 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
                 val c =
                     dm.query(DownloadManager.Query().setFilterById(downloadId))
                 if (c.moveToFirst()) {
-                    val status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS))
-                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                        holder.itemView.ivBtnPlaySender.visibility = View.VISIBLE
-                        holder.itemView.pbOutGoingImage.visibility = View.GONE
-                        mAdapter.notifyDataSetChanged()
+                    val safeIndex = c.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                    if (safeIndex != -1){
+                        val status = c.getInt(safeIndex)
+                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                            holder.itemView.ivBtnPlaySender.visibility = View.VISIBLE
+                            holder.itemView.pbOutGoingImage.visibility = View.GONE
+                            mAdapter.notifyDataSetChanged()
+                        }
+
                     }
+
                 }
                 c.close()
             }
@@ -1632,7 +1641,9 @@ class ChatActivity : LocalizeActivity(), View.OnClickListener {
         source?.close()
         destination?.close()
 
-        Log.e("MIME_TYPE", mime_type)
+        if (mime_type != null) {
+            Log.e("MIME_TYPE", mime_type)
+        }
         Log.e("FILE_SIZE", "$fileSize")
         Log.e("BASE_64", base64)
         Log.e("FILE_NAME", file.name)

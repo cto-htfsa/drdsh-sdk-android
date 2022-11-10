@@ -49,25 +49,24 @@
                 tools:text="this is the test message..." />
 
 
-            <com.github.siyamed.shapeimageview.RoundedImageView
+            <com.htf.drdshsdklibrary.Utills.RoundedImage
                 android:id="@+id/ivOutgoingMsg"
                 android:layout_width="150dp"
+                android:background="@drawable/rounded"
                 android:layout_height="150dp"
                 android:layout_below="@+id/tvOutgoingMsg"
                 android:layout_marginTop="5dp"
+                android:scaleType="centerCrop"
                 android:src="@drawable/download"
                 android:visibility="gone"
-                app:siRadius="10dp"
                 tools:visibility="visible" />
 
-            <net.bohush.geometricprogressview.GeometricProgressView
+            <ProgressBar
                 android:id="@+id/pbOutGoingImage"
                 android:layout_width="50dp"
                 android:layout_height="50dp"
                 android:layout_centerInParent="true"
                 android:visibility="gone"
-                app:gp_color="@color/colorLine"
-                app:gp_number_of_angles="10"
                 tools:visibility="visible" />
 
 
@@ -116,12 +115,13 @@
     </LinearLayout>
 
 
-    <com.github.siyamed.shapeimageview.CircularImageView
+    <com.htf.drdshsdklibrary.Utills.CircularImage
         android:id="@+id/ivUser"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
-        android:src="@drawable/user"
-        android:visibility="gone" />
+        android:scaleType="fitXY"
+        android:background="@drawable/circular"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/user"/>
 
 
 </LinearLayout>

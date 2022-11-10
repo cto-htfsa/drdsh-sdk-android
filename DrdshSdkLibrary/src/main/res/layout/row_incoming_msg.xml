@@ -9,12 +9,14 @@
     android:padding="10dp">
 
 
-    <com.github.siyamed.shapeimageview.CircularImageView
+    <com.htf.drdshsdklibrary.Utills.CircularImage
         android:id="@+id/ivAgent"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/circular"
+        android:scaleType="fitXY"
         android:src="@drawable/user"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
 
     <LinearLayout
@@ -61,11 +63,12 @@
                 android:visibility="gone"
                 tools:visibility="visible">
 
-                <com.github.siyamed.shapeimageview.RoundedImageView
+                <com.htf.drdshsdklibrary.Utills.RoundedImage
                     android:id="@+id/ivIncomingImage"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    app:siRadius="8dp" />
+                    android:background="@drawable/rounded"
+                    android:layout_width="150dp"
+                    android:scaleType="centerCrop"
+                    android:layout_height="150dp" />
 
                 <RelativeLayout
                     android:id="@+id/rlIncomingImageTransparent"
@@ -74,15 +77,13 @@
                     android:layout_height="match_parent"
                     android:background="@drawable/bg_transparent_msg_image">
 
-                    <net.bohush.geometricprogressview.GeometricProgressView
+                    <ProgressBar
                         android:id="@+id/pbIncomingImage"
                         android:layout_width="50dp"
                         android:layout_height="50dp"
                         android:layout_centerInParent="true"
                         android:visibility="gone"
-                        tools:visibility="visible"
-                        app:gp_color="@color/colorLine"
-                        app:gp_number_of_angles="10" />
+                        tools:visibility="visible" />
 
                     <ImageView
                         android:id="@+id/ivIncomingImageDownload"

@@ -154,17 +154,17 @@ object AppUtils {
         // get Connectivity Manager object to check connection
         val connec = activity.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        if (connec.getNetworkInfo(0).state == android.net.NetworkInfo.State.CONNECTED ||
-            connec.getNetworkInfo(1).state == android.net.NetworkInfo.State.CONNECTING ||
-            connec.getNetworkInfo(0).state == android.net.NetworkInfo.State.CONNECTING ||
-            connec.getNetworkInfo(1).state == android.net.NetworkInfo.State.CONNECTED
+        if (connec.getNetworkInfo(0)?.state == android.net.NetworkInfo.State.CONNECTED ||
+            connec.getNetworkInfo(1)?.state == android.net.NetworkInfo.State.CONNECTING ||
+            connec.getNetworkInfo(0)?.state == android.net.NetworkInfo.State.CONNECTING ||
+            connec.getNetworkInfo(1)?.state == android.net.NetworkInfo.State.CONNECTED
         ) {
 
             flag = true
 
-        } else if (connec.getNetworkInfo(0).state == android.net.NetworkInfo.State.DISCONNECTED || connec.getNetworkInfo(
+        } else if (connec.getNetworkInfo(0)?.state == android.net.NetworkInfo.State.DISCONNECTED || connec.getNetworkInfo(
                 1
-            ).state == android.net.NetworkInfo.State.DISCONNECTED
+            )?.state == android.net.NetworkInfo.State.DISCONNECTED
         ) {
 
             dialogInternet(activity, fragment, requestCode)

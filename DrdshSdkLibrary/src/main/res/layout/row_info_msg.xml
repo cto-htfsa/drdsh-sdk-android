@@ -15,18 +15,16 @@
         android:layout_marginBottom="10dp"
         android:orientation="horizontal">
 
-        <net.bohush.geometricprogressview.GeometricProgressView
+        <ProgressBar
             android:layout_width="30dp"
             android:layout_height="30dp"
-            app:gp_type="triangle"
+
             android:id="@+id/pbWaiting"
-            app:gp_number_of_angles="10"
-            app:gp_color="@color/colorDark"
-            app:gp_duration="800"
+
             android:visibility="gone"
             android:layout_marginEnd="10dp"
             android:layout_gravity="center"
-            app:gp_figure_padding="5dp"/>
+           />
 
         <TextView
             android:layout_width="wrap_content"

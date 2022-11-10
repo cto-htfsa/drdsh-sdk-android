@@ -3,12 +3,9 @@ package com.htf.drdshsdklibrary.Utills
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.MotionEvent
 import android.view.View
-import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
-import com.htf.drdshsdklibrary.R
 import com.htf.learnchinese.utils.AppPreferences
 import com.htf.learnchinese.utils.AppSession
 import java.util.*
